@@ -245,6 +245,28 @@ services:
     command:
       - "--web.listen-address=:9100"
 
+  loki:
+    image: grafana/loki:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config/loki/config.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+    command:
+      - "-config.file=/etc/loki/config.yml"
+
+  promtail:
+    image: grafana/promtail:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail-positions:/tmp/promtail
+    command:
+      - "-config.file=/etc/promtail/config.yml"
+
   # === Tools ===
 
   phpmyadmin:
@@ -280,3 +302,5 @@ services:
 
 volumes:
   prometheus-data:
+  loki-data:
+  promtail-positions:
