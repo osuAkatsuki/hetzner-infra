@@ -234,9 +234,65 @@ services:
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=90d"
       - "--storage.tsdb.retention.size=10GB"
+      - "--storage.tsdb.min-block-duration=2h"
+      - "--storage.tsdb.max-block-duration=2h"
       - "--web.listen-address=:9090"
+
+  thanos-sidecar:
+    image: thanosio/thanos:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - prometheus-data:/prometheus:ro
+      - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
+    command:
+      - "sidecar"
+      - "--tsdb.path=/prometheus"
+      - "--prometheus.url=http://127.0.0.1:9090"
+      - "--objstore.config-file=/etc/thanos/bucket.yml"
+      - "--grpc-address=0.0.0.0:10901"
+      - "--http-address=0.0.0.0:10902"
+
+  thanos-store:
+    image: thanosio/thanos:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
+    command:
+      - "store"
+      - "--objstore.config-file=/etc/thanos/bucket.yml"
+      - "--grpc-address=0.0.0.0:10903"
+      - "--http-address=0.0.0.0:10904"
+
+  thanos-query:
+    image: thanosio/thanos:latest
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "query"
+      - "--store=127.0.0.1:10901"
+      - "--store=127.0.0.1:10903"
+      - "--http-address=0.0.0.0:10905"
+      - "--grpc-address=0.0.0.0:10906"
+
+  thanos-compactor:
+    image: thanosio/thanos:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
+      - thanos-compactor-data:/data
+    command:
+      - "compact"
+      - "--objstore.config-file=/etc/thanos/bucket.yml"
+      - "--data-dir=/data"
+      - "--http-address=0.0.0.0:10907"
+      - "--wait"
+      - "--retention.resolution-raw=0d"
+      - "--retention.resolution-5m=0d"
+      - "--retention.resolution-1h=0d"
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -249,11 +305,15 @@ services:
     image: grafana/loki:latest
     restart: unless-stopped
     network_mode: host
+    environment:
+      WASABI_ACCESS_KEY: "${WASABI_ACCESS_KEY}"
+      WASABI_SECRET_KEY: "${WASABI_SECRET_KEY}"
     volumes:
       - ./config/loki/config.yml:/etc/loki/config.yml:ro
       - loki-data:/loki
     command:
       - "-config.file=/etc/loki/config.yml"
+      - "-config.expand-env=true"
 
   promtail:
     image: grafana/promtail:latest
@@ -302,5 +362,6 @@ services:
 
 volumes:
   prometheus-data:
+  thanos-compactor-data:
   loki-data:
   promtail-positions:

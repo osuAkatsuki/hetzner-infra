@@ -5,32 +5,39 @@ server:
 
 common:
   path_prefix: /loki
-  storage:
-    filesystem:
-      chunks_directory: /loki/chunks
-      rules_directory: /loki/rules
   replication_factor: 1
   ring:
     kvstore:
       store: inmemory
 
+storage_config:
+  tsdb_shipper:
+    active_index_directory: /loki/index
+    cache_location: /loki/index_cache
+  aws:
+    endpoint: "s3.ca-central-1.wasabisys.com"
+    region: "ca-central-1"
+    bucketnames: "akatsuki.pw"
+    access_key_id: "${WASABI_ACCESS_KEY}"
+    secret_access_key: "${WASABI_SECRET_KEY}"
+    s3forcepathstyle: true
+    storage_prefix: "observability/loki"
+
 schema_config:
   configs:
     - from: "2024-01-01"
       store: tsdb
-      object_store: filesystem
+      object_store: aws
       schema: v13
       index:
-        prefix: index_
+        prefix: loki_index_
         period: 24h
 
 limits_config:
-  retention_period: 90d
-  max_query_length: 90d
+  max_query_length: 0
+  retention_period: 0
 
 compactor:
   working_directory: /loki/compactor
   compaction_interval: 10m
-  retention_enabled: true
-  retention_delete_delay: 2h
-  delete_request_store: filesystem
+  retention_enabled: false

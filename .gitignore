@@ -7,6 +7,7 @@
 
 # Rendered configs (generated from templates with secrets injected)
 config/vault/config.local.hcl
+config/thanos/bucket.yml
 
 # OS
 .DS_Store
