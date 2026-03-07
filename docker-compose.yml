@@ -22,6 +22,16 @@ services:
       APP_ENV: "production"
       APP_COMPONENT: "pubsub-daemon"
 
+  bancho-service-rs-cleanup-cron:
+    image: osuakatsuki/bancho-service-rs:latest
+    restart: unless-stopped
+    network_mode: host
+    env_file: env/bancho-service-rs.env
+    environment:
+      PULL_SECRETS_FROM_VAULT: "0"
+      APP_ENV: "production"
+      APP_COMPONENT: "cleanup-cron"
+
   score-service:
     image: osuakatsuki/score-service:latest
     restart: unless-stopped
