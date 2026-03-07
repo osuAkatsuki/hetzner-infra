@@ -258,6 +258,7 @@ services:
     image: thanosio/thanos:v0.41.0
     restart: unless-stopped
     network_mode: host
+    user: "root"
     volumes:
       - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
       - thanos-store-data:/data
@@ -283,6 +284,7 @@ services:
     image: thanosio/thanos:v0.41.0
     restart: unless-stopped
     network_mode: host
+    user: "root"
     volumes:
       - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
       - thanos-compactor-data:/data
