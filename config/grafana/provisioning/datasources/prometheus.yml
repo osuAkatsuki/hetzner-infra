@@ -2,6 +2,7 @@ apiVersion: 1
 
 datasources:
   - name: Prometheus
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://127.0.0.1:10905
@@ -9,12 +10,14 @@ datasources:
     editable: true
 
   - name: Loki
+    uid: loki
     type: loki
     access: proxy
     url: http://127.0.0.1:3100
     editable: true
 
   - name: MySQL
+    uid: mysql
     type: mysql
     access: proxy
     url: 127.0.0.1:3306
@@ -29,6 +32,7 @@ datasources:
       password: grafana-readonly-2026
 
   - name: Redis
+    uid: redis
     type: redis-datasource
     access: proxy
     url: redis://127.0.0.1:6379
