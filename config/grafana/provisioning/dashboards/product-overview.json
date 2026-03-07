@@ -152,6 +152,9 @@
           },
           "unit": "short"
         }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" }
       }
     },
     {
@@ -176,6 +179,9 @@
           },
           "unit": "short"
         }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" }
       }
     },
     {
