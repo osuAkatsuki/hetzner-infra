@@ -9,10 +9,11 @@ apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
     docker.io docker-compose-v2 \
     mysql-server redis-server rabbitmq-server \
-    postgresql postgresql-contrib \
+    postgresql postgresql-contrib postgresql-16-postgis-3 \
     nginx \
     python3-pip python3-venv \
-    curl jq awscli
+    curl jq
+pip3 install --break-system-packages awscli
 
 echo "=== Installing HashiCorp Vault ==="
 wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
@@ -32,6 +33,7 @@ if [ -z "${VAULT_S3_ACCESS_KEY:-}" ] || [ -z "${VAULT_S3_SECRET_KEY:-}" ]; then
 fi
 id vault 2>/dev/null || useradd --system --home /opt/vault --shell /bin/false vault
 mkdir -p /opt/vault/data /opt/vault/tls /vault
+touch /vault/vault-audit.log
 envsubst < config/vault/config.hcl > /opt/vault/config.hcl
 chown -R vault:vault /opt/vault /vault
 cp systemd/vault.service /etc/systemd/system/vault.service
@@ -47,6 +49,25 @@ systemctl restart mysql
 echo "=== Configuring Redis ==="
 cp config/redis/redis.conf /etc/redis/redis.conf
 systemctl restart redis-server
+
+echo "=== Configuring RabbitMQ ==="
+if [ -z "${RABBITMQ_PASS:-}" ]; then
+    echo "ERROR: RABBITMQ_PASS must be set"
+    exit 1
+fi
+rabbitmqctl add_user rmq "$RABBITMQ_PASS" 2>/dev/null || rabbitmqctl change_password rmq "$RABBITMQ_PASS"
+rabbitmqctl set_permissions -p / rmq '.*' '.*' '.*'
+
+echo "=== Configuring PostgreSQL ==="
+if [ -z "${POSTGRES_K8S_PASS:-}" ]; then
+    echo "ERROR: POSTGRES_K8S_PASS must be set"
+    exit 1
+fi
+sudo -u postgres psql -c "CREATE USER k8s WITH PASSWORD '$POSTGRES_K8S_PASS';" 2>/dev/null || \
+    sudo -u postgres psql -c "ALTER USER k8s WITH PASSWORD '$POSTGRES_K8S_PASS';"
+for db in akatsuki_ai_bot akatsuki_management_bot travelplanner; do
+    sudo -u postgres psql -c "CREATE DATABASE $db OWNER k8s;" 2>/dev/null || true
+done
 
 echo "=== Configuring nginx ==="
 cp config/nginx/nginx.conf /etc/nginx/nginx.conf
