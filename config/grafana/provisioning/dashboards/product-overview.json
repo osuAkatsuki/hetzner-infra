@@ -5,7 +5,7 @@
   "timezone": "utc",
   "refresh": "1m",
   "time": {
-    "from": "now-24h",
+    "from": "now-7d",
     "to": "now"
   },
   "panels": [
@@ -61,13 +61,14 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT CONCAT('$', COUNT(*) * 5) as mrr FROM users WHERE donor_expire > UNIX_TIMESTAMP() AND privileges & 4",
+          "rawSql": "SELECT COUNT(*) * 5 as mrr FROM users WHERE donor_expire > UNIX_TIMESTAMP() AND privileges & 4",
           "format": "table",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "unit": "currencyUSD",
           "color": { "mode": "fixed", "fixedColor": "green" }
         }
       }
@@ -137,7 +138,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT\n  FROM_UNIXTIME(time - (time % 3600)) as time,\n  COUNT(*) as submissions\nFROM scores\nWHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY)\n  AND completed = 3\nGROUP BY time - (time % 3600)\nORDER BY time",
+          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.submissions FROM (SELECT FLOOR(time / 3600) as h, COUNT(*) as submissions FROM scores WHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND completed = 3 GROUP BY FLOOR(time / 3600)) t ORDER BY time",
           "format": "time_series",
           "refId": "A"
         }
@@ -163,7 +164,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT\n  FROM_UNIXTIME(created_at - (created_at % 3600)) as time,\n  COUNT(*) as unlocked\nFROM users_achievements\nWHERE created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY)\nGROUP BY created_at - (created_at % 3600)\nORDER BY time",
+          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.unlocked FROM (SELECT FLOOR(created_at / 3600) as h, COUNT(*) as unlocked FROM users_achievements WHERE created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) GROUP BY FLOOR(created_at / 3600)) t ORDER BY time",
           "format": "time_series",
           "refId": "A"
         }
@@ -189,7 +190,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT\n  FROM_UNIXTIME(register_datetime - (register_datetime % 86400)) as time,\n  COUNT(*) as registrations\nFROM users\nWHERE register_datetime >= UNIX_TIMESTAMP(NOW() - INTERVAL 90 DAY)\n  AND privileges & 1\nGROUP BY register_datetime - (register_datetime % 86400)\nORDER BY time",
+          "rawSql": "SELECT FROM_UNIXTIME(t.d * 86400) as time, t.registrations FROM (SELECT FLOOR(register_datetime / 86400) as d, COUNT(*) as registrations FROM users WHERE register_datetime >= UNIX_TIMESTAMP(NOW() - INTERVAL 90 DAY) AND privileges & 1 GROUP BY FLOOR(register_datetime / 86400)) t ORDER BY time",
           "format": "time_series",
           "refId": "A"
         }
@@ -215,7 +216,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT\n  d.month_start as time,\n  SUM(CASE WHEN u.donor_expire >= UNIX_TIMESTAMP(d.month_start) AND u.privileges & 4 THEN 5 ELSE 0 END) as mrr_usd\nFROM (\n  SELECT DATE_FORMAT(NOW() - INTERVAL n MONTH, '%Y-%m-01') as month_start\n  FROM (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5\n        UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11) months\n) d\nCROSS JOIN users u\nGROUP BY d.month_start\nORDER BY d.month_start",
+          "rawSql": "SELECT month_start as time, COUNT(*) * 5 as mrr_usd FROM (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11) months CROSS JOIN LATERAL (SELECT DATE_FORMAT(NOW() - INTERVAL months.n MONTH, '%Y-%m-01 00:00:00') as month_start) d CROSS JOIN LATERAL (SELECT id FROM users WHERE donor_expire >= UNIX_TIMESTAMP(d.month_start) AND privileges & 4) u GROUP BY month_start ORDER BY month_start",
           "format": "time_series",
           "refId": "A"
         }
@@ -299,7 +300,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT\n  a.name as achievement,\n  COUNT(*) as unlocks\nFROM users_achievements ua\nJOIN achievements a ON a.id = ua.achievement_id\nWHERE ua.created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY)\nGROUP BY ua.achievement_id\nORDER BY unlocks DESC\nLIMIT 15",
+          "rawSql": "SELECT a.name as achievement, COUNT(*) as unlocks FROM users_achievements ua JOIN achievements a ON a.id = ua.achievement_id WHERE ua.created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) GROUP BY ua.achievement_id, a.name ORDER BY unlocks DESC LIMIT 15",
           "format": "table",
           "refId": "A"
         }
@@ -313,7 +314,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT\n  CASE play_mode\n    WHEN 0 THEN 'osu!std'\n    WHEN 1 THEN 'osu!taiko'\n    WHEN 2 THEN 'osu!ctb'\n    WHEN 3 THEN 'osu!mania'\n  END as mode,\n  COUNT(*) as count\nFROM scores\nWHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY)\n  AND completed = 3\nGROUP BY play_mode\nORDER BY count DESC",
+          "rawSql": "SELECT CASE play_mode WHEN 0 THEN 'osu!std' WHEN 1 THEN 'osu!taiko' WHEN 2 THEN 'osu!ctb' WHEN 3 THEN 'osu!mania' END as mode, COUNT(*) as count FROM scores WHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND completed = 3 GROUP BY play_mode ORDER BY count DESC",
           "format": "table",
           "refId": "A"
         }
@@ -340,13 +341,13 @@
     },
     {
       "id": 20,
-      "title": "Recent Score Activity (last 24h by mode)",
+      "title": "Recent Score Activity by Mode",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 24 },
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT\n  FROM_UNIXTIME(time - (time % 3600)) as time,\n  CASE play_mode WHEN 0 THEN 'std' WHEN 1 THEN 'taiko' WHEN 2 THEN 'ctb' WHEN 3 THEN 'mania' END as metric,\n  COUNT(*) as value\nFROM scores\nWHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 24 HOUR)\n  AND completed = 3\nGROUP BY time - (time % 3600), play_mode\nORDER BY time",
+          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.mode as metric, t.value FROM (SELECT FLOOR(time / 3600) as h, CASE play_mode WHEN 0 THEN 'std' WHEN 1 THEN 'taiko' WHEN 2 THEN 'ctb' WHEN 3 THEN 'mania' END as mode, COUNT(*) as value FROM scores WHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND completed = 3 GROUP BY FLOOR(time / 3600), play_mode) t ORDER BY time",
           "format": "time_series",
           "refId": "A"
         }
