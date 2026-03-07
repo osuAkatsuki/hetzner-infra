@@ -240,7 +240,7 @@ services:
       - "--web.listen-address=:9090"
 
   thanos-sidecar:
-    image: thanosio/thanos:latest
+    image: thanosio/thanos:v0.41.0
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -255,7 +255,7 @@ services:
       - "--http-address=0.0.0.0:10902"
 
   thanos-store:
-    image: thanosio/thanos:latest
+    image: thanosio/thanos:v0.41.0
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -267,7 +267,7 @@ services:
       - "--http-address=0.0.0.0:10904"
 
   thanos-query:
-    image: thanosio/thanos:latest
+    image: thanosio/thanos:v0.41.0
     restart: unless-stopped
     network_mode: host
     command:
@@ -278,7 +278,7 @@ services:
       - "--grpc-address=0.0.0.0:10906"
 
   thanos-compactor:
-    image: thanosio/thanos:latest
+    image: thanosio/thanos:v0.41.0
     restart: unless-stopped
     network_mode: host
     volumes:
