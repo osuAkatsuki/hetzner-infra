@@ -21,7 +21,6 @@ storage_config:
     access_key_id: "${WASABI_ACCESS_KEY}"
     secret_access_key: "${WASABI_SECRET_KEY}"
     s3forcepathstyle: true
-    storage_prefix: "observability/loki"
 
 schema_config:
   configs:
