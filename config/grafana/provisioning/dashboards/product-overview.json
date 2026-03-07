@@ -1,0 +1,366 @@
+{
+  "uid": "product-overview",
+  "title": "Akatsuki Product Overview",
+  "tags": ["product"],
+  "timezone": "utc",
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Online Users (now)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "redis-datasource", "uid": "redis" },
+      "targets": [
+        {
+          "command": "scard",
+          "keyName": "peppy:online_users",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "value": null, "color": "dark-red" },
+              { "value": 10, "color": "yellow" },
+              { "value": 50, "color": "green" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Active Donors",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as active_donors FROM users WHERE donor_expire > UNIX_TIMESTAMP() AND privileges & 4",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "super-light-purple" }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Monthly Recurring Revenue",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT CONCAT('$', COUNT(*) * 5) as mrr FROM users WHERE donor_expire > UNIX_TIMESTAMP() AND privileges & 4",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Total Registered Users",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as total_users FROM users WHERE privileges & 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "blue" }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Total Scores (ranked)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as total FROM scores WHERE completed = 3",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "orange" }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Total Achievements Unlocked",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as total FROM users_achievements",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "yellow" }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Score Submissions",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  FROM_UNIXTIME(time - (time % 3600)) as time,\n  COUNT(*) as submissions\nFROM scores\nWHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY)\n  AND completed = 3\nGROUP BY time - (time % 3600)\nORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "gradientMode": "scheme"
+          },
+          "color": { "mode": "palette-classic" },
+          "unit": "short",
+          "displayName": "Ranked scores/hr"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Achievements Unlocked",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  FROM_UNIXTIME(created_at - (created_at % 3600)) as time,\n  COUNT(*) as unlocked\nFROM users_achievements\nWHERE created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY)\nGROUP BY created_at - (created_at % 3600)\nORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "gradientMode": "scheme"
+          },
+          "color": { "mode": "palette-classic" },
+          "unit": "short",
+          "displayName": "Achievements/hr"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "New User Registrations",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  FROM_UNIXTIME(register_datetime - (register_datetime % 86400)) as time,\n  COUNT(*) as registrations\nFROM users\nWHERE register_datetime >= UNIX_TIMESTAMP(NOW() - INTERVAL 90 DAY)\n  AND privileges & 1\nGROUP BY register_datetime - (register_datetime % 86400)\nORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "gradientMode": "scheme"
+          },
+          "color": { "mode": "palette-classic" },
+          "unit": "short",
+          "displayName": "Signups/day"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Donor Subscription MRR Timeline",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  d.month_start as time,\n  SUM(CASE WHEN u.donor_expire >= UNIX_TIMESTAMP(d.month_start) AND u.privileges & 4 THEN 5 ELSE 0 END) as mrr_usd\nFROM (\n  SELECT DATE_FORMAT(NOW() - INTERVAL n MONTH, '%Y-%m-01') as month_start\n  FROM (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5\n        UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11) months\n) d\nCROSS JOIN users u\nGROUP BY d.month_start\nORDER BY d.month_start",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "pointSize": 8,
+            "showPoints": "always"
+          },
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "unit": "currencyUSD",
+          "displayName": "MRR"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "title": "Active Users (last 24h)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 20 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as dau FROM users WHERE latest_activity >= UNIX_TIMESTAMP(NOW() - INTERVAL 1 DAY) AND privileges & 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "light-blue" }
+        }
+      }
+    },
+    {
+      "id": 15,
+      "title": "Active Users (last 7d)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 20 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as wau FROM users WHERE latest_activity >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND privileges & 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "light-blue" }
+        }
+      }
+    },
+    {
+      "id": 16,
+      "title": "Active Users (last 30d)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 20 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as mau FROM users WHERE latest_activity >= UNIX_TIMESTAMP(NOW() - INTERVAL 30 DAY) AND privileges & 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "light-blue" }
+        }
+      }
+    },
+    {
+      "id": 17,
+      "title": "Top Achievements (last 7d)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  a.name as achievement,\n  COUNT(*) as unlocks\nFROM users_achievements ua\nJOIN achievements a ON a.id = ua.achievement_id\nWHERE ua.created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY)\nGROUP BY ua.achievement_id\nORDER BY unlocks DESC\nLIMIT 15",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "Score Submissions by Mode (last 7d)",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 24 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  CASE play_mode\n    WHEN 0 THEN 'osu!std'\n    WHEN 1 THEN 'osu!taiko'\n    WHEN 2 THEN 'osu!ctb'\n    WHEN 3 THEN 'osu!mania'\n  END as mode,\n  COUNT(*) as count\nFROM scores\nWHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY)\n  AND completed = 3\nGROUP BY play_mode\nORDER BY count DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "title": "Active Multiplayer Matches (last 7d)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 20 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as matches FROM matches WHERE start_time >= NOW() - INTERVAL 7 DAY",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "light-purple" }
+        }
+      }
+    },
+    {
+      "id": 20,
+      "title": "Recent Score Activity (last 24h by mode)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 24 },
+      "datasource": { "type": "mysql", "uid": "mysql" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  FROM_UNIXTIME(time - (time % 3600)) as time,\n  CASE play_mode WHEN 0 THEN 'std' WHEN 1 THEN 'taiko' WHEN 2 THEN 'ctb' WHEN 3 THEN 'mania' END as metric,\n  COUNT(*) as value\nFROM scores\nWHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 24 HOUR)\n  AND completed = 3\nGROUP BY time - (time % 3600), play_mode\nORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "stacking": { "mode": "normal" }
+          }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39
+}
