@@ -239,7 +239,7 @@ services:
   # === Non-Akatsuki ===
 
   travelplanner-api:
-    image: osuakatsuki/travelplanner:latest
+    image: osuakatsuki/travelplanner-api:latest
     restart: unless-stopped
     network_mode: host
     environment:
