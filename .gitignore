@@ -2,6 +2,8 @@
 .env
 *.env
 !.env.example
+/env/
+/vault-backups/
 
 # Rendered configs (generated from templates with secrets injected)
 config/vault/config.local.hcl

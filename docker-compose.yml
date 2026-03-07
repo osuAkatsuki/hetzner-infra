@@ -5,10 +5,9 @@ services:
     image: osuakatsuki/bancho-service-rs:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/bancho-service-rs.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "api"
       APP_PORT: "5001"
@@ -17,10 +16,9 @@ services:
     image: osuakatsuki/bancho-service-rs:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/bancho-service-rs.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "pubsub-daemon"
 
@@ -28,10 +26,9 @@ services:
     image: osuakatsuki/score-service:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/score-service.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "api"
       APP_PORT: "7000"
@@ -40,10 +37,9 @@ services:
     image: osuakatsuki/beatmaps-service:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/beatmaps-service.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "api"
       APP_PORT: "8081"
@@ -52,10 +48,9 @@ services:
     image: osuakatsuki/performance-service:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/performance-service.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "api"
       APP_PORT: "8665"
@@ -64,10 +59,9 @@ services:
     image: osuakatsuki/performance-service:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/performance-service.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "processor"
 
@@ -77,10 +71,9 @@ services:
     image: osuakatsuki/hanayo:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/hanayo.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_PORT: "46221"
 
@@ -88,10 +81,9 @@ services:
     image: osuakatsuki/akatsuki-api:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/akatsuki-api.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_PORT: "40001"
 
@@ -99,10 +91,9 @@ services:
     image: osuakatsuki/akatsuki-web:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/akatsuki-web.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_PORT: "3000"
 
@@ -110,10 +101,9 @@ services:
     image: osuakatsuki/admin-panel:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/admin-panel.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_PORT: "8086"
 
@@ -123,10 +113,9 @@ services:
     image: osuakatsuki/users-service:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/users-service.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "api"
       APP_PORT: "8082"
@@ -135,10 +124,9 @@ services:
     image: osuakatsuki/assets-service:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/assets-service.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "api"
       APP_PORT: "8083"
@@ -147,10 +135,9 @@ services:
     image: osuakatsuki/payments-service:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/payments-service.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "api"
       APP_PORT: "8084"
@@ -159,10 +146,9 @@ services:
     image: osuakatsuki/profile-history-service:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/profile-history-service.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "api"
       APP_PORT: "8085"
@@ -171,10 +157,9 @@ services:
     image: osuakatsuki/nachalo-konca:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/nachalo-konca.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "amqp-processor"
 
@@ -182,10 +167,9 @@ services:
     image: osuakatsuki/air-conditioning-service:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/air-conditioning-service.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "api"
       APP_PORT: "8088"
@@ -194,10 +178,9 @@ services:
     image: osuakatsuki/rework-frontend:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/rework-frontend.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_PORT: "8089"
 
@@ -207,10 +190,9 @@ services:
     image: osuakatsuki/ai-discord-bot:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/ai-discord-bot.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "bot"
 
@@ -218,10 +200,9 @@ services:
     image: osuakatsuki/management-discord-bot:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/management-discord-bot.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "bot"
 
@@ -242,10 +223,9 @@ services:
     image: osuakatsuki/travelplanner-api:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/travelplanner.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_PORT: "8090"
 
@@ -253,9 +233,8 @@ services:
     image: osuakatsuki/travelplanner-web:latest
     restart: unless-stopped
     network_mode: host
+    env_file: env/travelplanner-web.env
     environment:
-      PULL_SECRETS_FROM_VAULT: "1"
-      VAULT_ADDR: "http://127.0.0.1:8200"
-      VAULT_TOKEN: "${VAULT_TOKEN}"
+      PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_PORT: "8091"
