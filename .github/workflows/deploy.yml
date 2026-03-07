@@ -1,0 +1,42 @@
+name: Deploy infrastructure config
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy configs to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/akatsuki/hetzner-infra
+            git fetch origin main
+            git checkout origin/main
+
+            # Apply config changes
+            cp config/mysql/99-akatsuki.cnf /etc/mysql/mysql.conf.d/99-akatsuki.cnf
+            cp config/redis/redis.conf /etc/redis/redis.conf
+            cp config/vault/config.hcl /opt/vault/config.hcl
+            cp config/nginx/nginx.conf /etc/nginx/nginx.conf
+            cp config/nginx/sites-enabled/*.conf /etc/nginx/sites-enabled/
+
+            # Validate and reload nginx
+            nginx -t
+            systemctl reload nginx
+
+            # Restart data services only if their configs changed
+            systemctl restart redis-server
+            # MySQL and Vault require manual restart for safety
