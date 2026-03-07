@@ -75,6 +75,7 @@ services:
     environment:
       PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
+      APP_COMPONENT: "api"
       APP_PORT: "46221"
 
   akatsuki-api:
@@ -85,6 +86,7 @@ services:
     environment:
       PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
+      APP_COMPONENT: "api"
       APP_PORT: "40001"
 
   akatsuki-web:
@@ -95,7 +97,10 @@ services:
     environment:
       PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
+      APP_COMPONENT: "web"
       APP_PORT: "3000"
+    volumes:
+      - ./env/akatsuki-web.env:/usr/src/app/.env:ro
 
   admin-panel:
     image: osuakatsuki/admin-panel:latest
@@ -105,7 +110,17 @@ services:
     environment:
       PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
+      APP_COMPONENT: "api"
       APP_PORT: "8086"
+    entrypoint:
+      - bash
+      - -c
+      - |
+        sed -i 's/listen 80;/listen 8086;/' /etc/nginx/sites-enabled/admin_panel.conf
+        sed -i 's/listen 80/listen 8086/' /etc/nginx/sites-available/default
+        sed -i 's/listen \[::\]:80/listen [::]:8086/' /etc/nginx/sites-available/default
+        sed -i 's/listen      80;/listen      8086;/' /etc/nginx/nginx.conf
+        exec ./scripts/bootstrap.sh
 
   # === Internal services ===
 
@@ -182,6 +197,7 @@ services:
     environment:
       PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
+      APP_COMPONENT: "api"
       APP_PORT: "8089"
 
   # === Discord bots ===
@@ -195,6 +211,8 @@ services:
       PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "bot"
+    volumes:
+      - ./env/ai-discord-bot.env:/srv/root/.env:ro
 
   management-discord-bot:
     image: osuakatsuki/management-discord-bot:latest
@@ -205,6 +223,8 @@ services:
       PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
       APP_COMPONENT: "bot"
+    volumes:
+      - ./env/management-discord-bot.env:/srv/root/.env:ro
 
   # === Observability ===
 
@@ -362,7 +382,10 @@ services:
     environment:
       PULL_SECRETS_FROM_VAULT: "0"
       APP_ENV: "production"
+      APP_COMPONENT: "web"
       APP_PORT: "8091"
+    volumes:
+      - ./env/travelplanner-web.env:/usr/src/app/.env:ro
 
 volumes:
   prometheus-data:
