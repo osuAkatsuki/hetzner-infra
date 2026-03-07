@@ -224,6 +224,7 @@ services:
       GF_DATABASE_NAME: "grafana"
       GF_DATABASE_USER: "grafana"
       GF_DATABASE_PASSWORD: "REDACTED_GRAFANA_DB_PASSWORD"
+      GF_INSTALL_PLUGINS: "redis-datasource"
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning
 

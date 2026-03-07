@@ -13,3 +13,23 @@ datasources:
     access: proxy
     url: http://127.0.0.1:3100
     editable: true
+
+  - name: MySQL
+    type: mysql
+    access: proxy
+    url: 127.0.0.1:3306
+    database: akatsuki
+    user: grafana_ro
+    editable: true
+    jsonData:
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+    secureJsonData:
+      password: REDACTED_GRAFANA_READONLY_PASSWORD
+
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis://127.0.0.1:6379
+    editable: true
