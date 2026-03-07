@@ -139,7 +139,7 @@
       "targets": [
         {
           "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.submissions FROM (SELECT FLOOR(time / 3600) as h, COUNT(*) as submissions FROM scores WHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND completed = 3 GROUP BY FLOOR(time / 3600)) t ORDER BY time",
-          "format": "time_series",
+          "format": "table",
           "refId": "A"
         }
       ],
@@ -150,7 +150,7 @@
             "fillOpacity": 50,
             "gradientMode": "scheme"
           },
-          "color": { "mode": "palette-classic" },
+          "color": { "mode": "fixed", "fixedColor": "semi-dark-blue" },
           "unit": "short",
           "displayName": "Ranked scores/hr"
         }
@@ -165,7 +165,7 @@
       "targets": [
         {
           "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.unlocked FROM (SELECT FLOOR(created_at / 3600) as h, COUNT(*) as unlocked FROM users_achievements WHERE created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) GROUP BY FLOOR(created_at / 3600)) t ORDER BY time",
-          "format": "time_series",
+          "format": "table",
           "refId": "A"
         }
       ],
@@ -176,7 +176,7 @@
             "fillOpacity": 50,
             "gradientMode": "scheme"
           },
-          "color": { "mode": "palette-classic" },
+          "color": { "mode": "fixed", "fixedColor": "semi-dark-yellow" },
           "unit": "short",
           "displayName": "Achievements/hr"
         }
@@ -191,7 +191,7 @@
       "targets": [
         {
           "rawSql": "SELECT FROM_UNIXTIME(t.d * 86400) as time, t.registrations FROM (SELECT FLOOR(register_datetime / 86400) as d, COUNT(*) as registrations FROM users WHERE register_datetime >= UNIX_TIMESTAMP(NOW() - INTERVAL 90 DAY) AND privileges & 1 GROUP BY FLOOR(register_datetime / 86400)) t ORDER BY time",
-          "format": "time_series",
+          "format": "table",
           "refId": "A"
         }
       ],
@@ -202,7 +202,7 @@
             "fillOpacity": 50,
             "gradientMode": "scheme"
           },
-          "color": { "mode": "palette-classic" },
+          "color": { "mode": "fixed", "fixedColor": "semi-dark-green" },
           "unit": "short",
           "displayName": "Signups/day"
         }
@@ -217,7 +217,7 @@
       "targets": [
         {
           "rawSql": "SELECT month_start as time, COUNT(*) * 5 as mrr_usd FROM (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11) months CROSS JOIN LATERAL (SELECT DATE_FORMAT(NOW() - INTERVAL months.n MONTH, '%Y-%m-01 00:00:00') as month_start) d CROSS JOIN LATERAL (SELECT id FROM users WHERE donor_expire >= UNIX_TIMESTAMP(d.month_start) AND privileges & 4) u GROUP BY month_start ORDER BY month_start",
-          "format": "time_series",
+          "format": "table",
           "refId": "A"
         }
       ],
@@ -348,7 +348,7 @@
       "targets": [
         {
           "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.mode as metric, t.value FROM (SELECT FLOOR(time / 3600) as h, CASE play_mode WHEN 0 THEN 'std' WHEN 1 THEN 'taiko' WHEN 2 THEN 'ctb' WHEN 3 THEN 'mania' END as mode, COUNT(*) as value FROM scores WHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND completed = 3 GROUP BY FLOOR(time / 3600), play_mode) t ORDER BY time",
-          "format": "time_series",
+          "format": "table",
           "refId": "A"
         }
       ],
