@@ -37,6 +37,9 @@ jobs:
             nginx -t
             systemctl reload nginx
 
+            # Apply firewall rules
+            bash scripts/apply-firewall.sh
+
             # Restart data services only if their configs changed
             systemctl restart redis-server
             # MySQL and Vault require manual restart for safety

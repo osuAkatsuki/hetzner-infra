@@ -113,6 +113,8 @@ services:
       APP_PORT: "8086"
     # TODO: fix port in admin-panel repo to read from env var
     entrypoint: ["bash", "-c", "sed -i 's/listen\\([[:space:]]*\\)80\\b/listen\\18086/g; s/\\[::\\]:80\\b/[::]:8086/g' /etc/nginx/sites-enabled/admin_panel.conf /etc/nginx/sites-available/default /etc/nginx/nginx.conf && exec ./scripts/bootstrap.sh"]
+    volumes:
+      - ./env/admin-panel.env:/usr/src/app/.env:ro
 
   # === Internal services ===
 
