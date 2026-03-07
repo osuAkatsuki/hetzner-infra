@@ -138,7 +138,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.mode as metric, t.count as value FROM (SELECT FLOOR(time / 3600) as h, CASE play_mode WHEN 0 THEN 'std' WHEN 1 THEN 'taiko' WHEN 2 THEN 'ctb' WHEN 3 THEN 'mania' END as mode, COUNT(*) as count FROM scores WHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND completed = 3 GROUP BY FLOOR(time / 3600), play_mode) t ORDER BY time",
+          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, SUM(CASE WHEN t.pm = 0 THEN t.c ELSE 0 END) as std, SUM(CASE WHEN t.pm = 1 THEN t.c ELSE 0 END) as taiko, SUM(CASE WHEN t.pm = 2 THEN t.c ELSE 0 END) as ctb, SUM(CASE WHEN t.pm = 3 THEN t.c ELSE 0 END) as mania FROM (SELECT FLOOR(time / 3600) as h, play_mode as pm, COUNT(*) as c FROM scores WHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND completed = 3 GROUP BY FLOOR(time / 3600), play_mode) t GROUP BY t.h ORDER BY time",
           "format": "table",
           "refId": "A"
         }
@@ -162,7 +162,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.mode as metric, t.count as value FROM (SELECT FLOOR(created_at / 3600) as h, CASE mode WHEN 0 THEN 'std' WHEN 1 THEN 'taiko' WHEN 2 THEN 'ctb' WHEN 3 THEN 'mania' END as mode, COUNT(*) as count FROM users_achievements WHERE created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) GROUP BY FLOOR(created_at / 3600), mode) t ORDER BY time",
+          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, SUM(CASE WHEN t.m = 0 THEN t.c ELSE 0 END) as std, SUM(CASE WHEN t.m = 1 THEN t.c ELSE 0 END) as taiko, SUM(CASE WHEN t.m = 2 THEN t.c ELSE 0 END) as ctb, SUM(CASE WHEN t.m = 3 THEN t.c ELSE 0 END) as mania FROM (SELECT FLOOR(created_at / 3600) as h, mode as m, COUNT(*) as c FROM users_achievements WHERE created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) GROUP BY FLOOR(created_at / 3600), mode) t GROUP BY t.h ORDER BY time",
           "format": "table",
           "refId": "A"
         }
