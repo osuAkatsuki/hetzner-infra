@@ -14,7 +14,6 @@ storage_config:
   tsdb_shipper:
     active_index_directory: /loki/index
     cache_location: /loki/index_cache
-    shared_store_key_prefix: "observability/loki/index/"
   aws:
     endpoint: "s3.ca-central-1.wasabisys.com"
     region: "ca-central-1"
