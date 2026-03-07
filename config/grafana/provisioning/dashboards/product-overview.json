@@ -132,13 +132,13 @@
     },
     {
       "id": 10,
-      "title": "Score Submissions",
+      "title": "Score Submissions by Mode",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.submissions FROM (SELECT FLOOR(time / 3600) as h, COUNT(*) as submissions FROM scores WHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND completed = 3 GROUP BY FLOOR(time / 3600)) t ORDER BY time",
+          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.mode as metric, t.count as value FROM (SELECT FLOOR(time / 3600) as h, CASE play_mode WHEN 0 THEN 'std' WHEN 1 THEN 'taiko' WHEN 2 THEN 'ctb' WHEN 3 THEN 'mania' END as mode, COUNT(*) as count FROM scores WHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND completed = 3 GROUP BY FLOOR(time / 3600), play_mode) t ORDER BY time",
           "format": "table",
           "refId": "A"
         }
@@ -147,24 +147,22 @@
         "defaults": {
           "custom": {
             "drawStyle": "bars",
-            "fillOpacity": 50,
-            "gradientMode": "scheme"
+            "fillOpacity": 80,
+            "stacking": { "mode": "normal" }
           },
-          "color": { "mode": "fixed", "fixedColor": "semi-dark-blue" },
-          "unit": "short",
-          "displayName": "Ranked scores/hr"
+          "unit": "short"
         }
       }
     },
     {
       "id": 11,
-      "title": "Achievements Unlocked",
+      "title": "Achievements Unlocked by Mode",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.unlocked FROM (SELECT FLOOR(created_at / 3600) as h, COUNT(*) as unlocked FROM users_achievements WHERE created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) GROUP BY FLOOR(created_at / 3600)) t ORDER BY time",
+          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.mode as metric, t.count as value FROM (SELECT FLOOR(created_at / 3600) as h, CASE mode WHEN 0 THEN 'std' WHEN 1 THEN 'taiko' WHEN 2 THEN 'ctb' WHEN 3 THEN 'mania' END as mode, COUNT(*) as count FROM users_achievements WHERE created_at >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) GROUP BY FLOOR(created_at / 3600), mode) t ORDER BY time",
           "format": "table",
           "refId": "A"
         }
@@ -173,12 +171,10 @@
         "defaults": {
           "custom": {
             "drawStyle": "bars",
-            "fillOpacity": 50,
-            "gradientMode": "scheme"
+            "fillOpacity": 80,
+            "stacking": { "mode": "normal" }
           },
-          "color": { "mode": "fixed", "fixedColor": "semi-dark-yellow" },
-          "unit": "short",
-          "displayName": "Achievements/hr"
+          "unit": "short"
         }
       }
     },
@@ -341,24 +337,20 @@
     },
     {
       "id": 20,
-      "title": "Recent Score Activity by Mode",
-      "type": "timeseries",
+      "title": "Donor Expiry Distribution",
+      "type": "stat",
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 24 },
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(t.h * 3600) as time, t.mode as metric, t.value FROM (SELECT FLOOR(time / 3600) as h, CASE play_mode WHEN 0 THEN 'std' WHEN 1 THEN 'taiko' WHEN 2 THEN 'ctb' WHEN 3 THEN 'mania' END as mode, COUNT(*) as value FROM scores WHERE time >= UNIX_TIMESTAMP(NOW() - INTERVAL 7 DAY) AND completed = 3 GROUP BY FLOOR(time / 3600), play_mode) t ORDER BY time",
+          "rawSql": "SELECT SUM(CASE WHEN donor_expire > UNIX_TIMESTAMP() AND donor_expire <= UNIX_TIMESTAMP() + 86400*30 THEN 1 ELSE 0 END) as 'Expiring <30d', SUM(CASE WHEN donor_expire > UNIX_TIMESTAMP() + 86400*30 THEN 1 ELSE 0 END) as 'Expiring >30d' FROM users WHERE privileges & 4 AND donor_expire > UNIX_TIMESTAMP()",
           "format": "table",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "stacking": { "mode": "normal" }
-          }
+          "color": { "mode": "fixed", "fixedColor": "light-green" }
         }
       }
     }
