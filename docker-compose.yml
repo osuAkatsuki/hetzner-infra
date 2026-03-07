@@ -192,6 +192,17 @@ services:
       APP_COMPONENT: "api"
       APP_PORT: "8089"
 
+  # === Cron jobs (triggered by host crontab, not always-running) ===
+
+  new-cron:
+    image: osuakatsuki/new-cron:latest
+    network_mode: host
+    env_file: env/new-cron.env
+    environment:
+      PULL_SECRETS_FROM_VAULT: "0"
+      APP_ENV: "production"
+    profiles: ["cron"]
+
   # === Discord bots ===
 
   ai-discord-bot:
