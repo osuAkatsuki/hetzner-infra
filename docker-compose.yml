@@ -117,8 +117,7 @@ services:
       APP_ENV: "production"
       APP_COMPONENT: "api"
       APP_PORT: "8086"
-    # TODO: fix port in admin-panel repo to read from env var
-    entrypoint: ["bash", "-c", "sed -i 's/listen\\([[:space:]]*\\)80\\b/listen\\18086/g; s/\\[::\\]:80\\b/[::]:8086/g' /etc/nginx/sites-enabled/admin_panel.conf /etc/nginx/sites-available/default /etc/nginx/nginx.conf && set -a && source ./scripts/bootstrap.sh"]
+    entrypoint: ["bash", "-c", "set -a && source ./scripts/bootstrap.sh"]
 
   # === Internal services ===
 
@@ -389,8 +388,7 @@ services:
       APP_ENV: "production"
       APP_COMPONENT: "web"
       APP_PORT: "8091"
-    # TODO: fix port in travelplanner-web repo to read from env var
-    entrypoint: ["bash", "-c", "sed -i 's/listen 80/listen 8091/' /etc/nginx/conf.d/default.conf && set -a && source ./entrypoint.sh"]
+    entrypoint: ["bash", "-c", "set -a && source ./entrypoint.sh"]
 
 volumes:
   prometheus-data:
