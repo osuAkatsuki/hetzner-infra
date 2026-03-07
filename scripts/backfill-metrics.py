@@ -161,6 +161,7 @@ def create_and_upload_block(block_file, output_base):
     result = subprocess.run(
         [
             "docker", "run", "--rm",
+            "--user", "root",
             "-v", f"{block_file}:/data/metrics.txt:ro",
             "-v", f"{block_dir}:/data/output:rw",
             "--entrypoint", "promtool",
