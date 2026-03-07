@@ -42,7 +42,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT COUNT(*) as active_donors FROM users WHERE donor_expire > UNIX_TIMESTAMP() AND privileges & 4",
+          "rawSql": "SELECT COUNT(*) as active_donors FROM users WHERE donor_expire > UNIX_TIMESTAMP() AND donor_expire != 2147483647 AND privileges & 4",
           "format": "table",
           "refId": "A"
         }
@@ -61,7 +61,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT COUNT(*) * 5 as mrr FROM users WHERE donor_expire > UNIX_TIMESTAMP() AND privileges & 4",
+          "rawSql": "SELECT COUNT(*) * 5 as mrr FROM users WHERE donor_expire > UNIX_TIMESTAMP() AND donor_expire != 2147483647 AND privileges & 4",
           "format": "table",
           "refId": "A"
         }
@@ -212,7 +212,7 @@
       "datasource": { "type": "mysql", "uid": "mysql" },
       "targets": [
         {
-          "rawSql": "SELECT month_start as time, COUNT(*) * 5 as mrr_usd FROM (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11) months CROSS JOIN LATERAL (SELECT DATE_FORMAT(NOW() - INTERVAL months.n MONTH, '%Y-%m-01 00:00:00') as month_start) d CROSS JOIN LATERAL (SELECT id FROM users WHERE donor_expire >= UNIX_TIMESTAMP(d.month_start) AND privileges & 4) u GROUP BY month_start ORDER BY month_start",
+          "rawSql": "SELECT month_start as time, COUNT(*) * 5 as mrr_usd FROM (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11) months CROSS JOIN LATERAL (SELECT DATE_FORMAT(NOW() - INTERVAL months.n MONTH, '%Y-%m-01 00:00:00') as month_start) d CROSS JOIN LATERAL (SELECT id FROM users WHERE donor_expire >= UNIX_TIMESTAMP(d.month_start) AND donor_expire != 2147483647 AND privileges & 4) u GROUP BY month_start ORDER BY month_start",
           "format": "table",
           "refId": "A"
         }
