@@ -14,6 +14,7 @@ storage_config:
   tsdb_shipper:
     active_index_directory: /loki/index
     cache_location: /loki/index_cache
+    shared_store_key_prefix: "observability/loki/index/"
   aws:
     endpoint: "s3.ca-central-1.wasabisys.com"
     region: "ca-central-1"
@@ -22,6 +23,12 @@ storage_config:
     secret_access_key: "${WASABI_SECRET_KEY}"
     s3forcepathstyle: true
 
+chunk_store_config:
+  chunk_cache_config:
+    embedded_cache:
+      enabled: true
+      max_size_mb: 100
+
 schema_config:
   configs:
     - from: "2024-01-01"
@@ -29,7 +36,7 @@ schema_config:
       object_store: aws
       schema: v13
       index:
-        prefix: loki_index_
+        prefix: observability/loki/index_
         period: 24h
 
 limits_config:
