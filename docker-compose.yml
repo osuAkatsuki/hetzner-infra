@@ -102,7 +102,7 @@ services:
       APP_COMPONENT: "api"
       APP_PORT: "8086"
     # TODO: fix port in admin-panel repo to read from env var
-    entrypoint: ["bash", "-c", "sed -i 's/listen 80\\b/listen 8086/g' /etc/nginx/sites-enabled/admin_panel.conf /etc/nginx/sites-available/default && exec ./scripts/bootstrap.sh"]
+    entrypoint: ["bash", "-c", "sed -i 's/listen 80\\b/listen 8086/g; s/\\[::\\]:80\\b/[::]:8086/g' /etc/nginx/sites-enabled/admin_panel.conf /etc/nginx/sites-available/default && exec ./scripts/bootstrap.sh"]
 
   # === Internal services ===
 
