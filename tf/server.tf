@@ -5,8 +5,8 @@ resource "hcloud_ssh_key" "deploy" {
 
 resource "hcloud_server" "production" {
   name        = "akatsuki-production"
-  server_type = "cx53"
-  location    = "fsn1"
+  server_type = "cpx42"
+  location    = "nbg1"
   image       = "ubuntu-24.04"
   ssh_keys    = [hcloud_ssh_key.deploy.id]
 
