@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Hetzner AX42-U server bootstrap script
+# Hetzner Cloud CX53 server bootstrap script
 # Installs and configures all services for Akatsuki production
+
+echo "=== Creating swap file (4GB) ==="
+fallocate -l 4G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 echo "=== Installing system packages ==="
 apt-get update
