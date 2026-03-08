@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Hetzner Cloud CX53 server bootstrap script
+# Hetzner Cloud CPX42 server bootstrap script
 # Installs and configures all services for Akatsuki production
 
 echo "=== Creating swap file (4GB) ==="

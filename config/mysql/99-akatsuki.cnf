@@ -3,8 +3,8 @@
 bind-address = 0.0.0.0
 max_connections = 500
 
-# InnoDB - 20GB buffer pool for 32GB RAM system (CX53 VPS)
-innodb_buffer_pool_size = 21474836480
+# InnoDB - 8GB buffer pool for 16GB RAM system (CPX42 VPS)
+innodb_buffer_pool_size = 8589934592
 innodb_buffer_pool_instances = 4
 innodb_flush_log_at_trx_commit = 1
 innodb_flush_method = O_DIRECT
