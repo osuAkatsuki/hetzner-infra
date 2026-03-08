@@ -39,12 +39,12 @@ if [ -z "${VAULT_S3_ACCESS_KEY:-}" ] || [ -z "${VAULT_S3_SECRET_KEY:-}" ]; then
     exit 1
 fi
 id vault 2>/dev/null || useradd --system --home /opt/vault --shell /bin/false vault
-mkdir -p /opt/vault/data /opt/vault/tls /vault
+mkdir -p /opt/vault/data /opt/vault/tls /vault /etc/vault.d
 touch /vault/vault-audit.log
-envsubst < config/vault/config.hcl > /opt/vault/config.hcl
-chown -R vault:vault /opt/vault /vault
-cp systemd/vault.service /etc/systemd/system/vault.service
-systemctl daemon-reload
+# Vault's package installs a default config at /etc/vault.d/vault.hcl;
+# overwrite it with ours so the default systemd unit picks it up.
+envsubst < config/vault/config.hcl > /etc/vault.d/vault.hcl
+chown -R vault:vault /opt/vault /vault /etc/vault.d
 systemctl enable vault
 
 echo "=== Configuring MySQL ==="
