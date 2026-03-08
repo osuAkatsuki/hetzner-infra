@@ -1,7 +1,10 @@
 x-vault-env: &vault-env
   PULL_SECRETS_FROM_VAULT: "1"
-  VAULT_ADDR: "http://127.0.0.1:8200"
+  VAULT_ADDR: "http://host.docker.internal:8200"
   VAULT_TOKEN: "${VAULT_TOKEN}"
+
+x-extra-hosts: &extra-hosts
+  - "host.docker.internal:host-gateway"
 
 services:
   # === osu! core services ===
@@ -9,7 +12,9 @@ services:
   bancho-service-rs-api:
     image: osuakatsuki/bancho-service-rs:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "5001:5001"
     entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
     environment:
       <<: *vault-env
@@ -20,7 +25,7 @@ services:
   bancho-service-rs-pubsub-daemon:
     image: osuakatsuki/bancho-service-rs:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
     environment:
       <<: *vault-env
@@ -31,7 +36,7 @@ services:
   bancho-service-rs-cleanup-cron:
     image: osuakatsuki/bancho-service-rs:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
     environment:
       <<: *vault-env
@@ -42,7 +47,9 @@ services:
   score-service:
     image: osuakatsuki/score-service:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "7000:7000"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -53,7 +60,9 @@ services:
   beatmaps-service:
     image: osuakatsuki/beatmaps-service:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8081:8081"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -64,7 +73,9 @@ services:
   performance-service-api:
     image: osuakatsuki/performance-service:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8665:8665"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -75,7 +86,7 @@ services:
   performance-service-processor:
     image: osuakatsuki/performance-service:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -87,7 +98,9 @@ services:
   hanayo:
     image: osuakatsuki/hanayo:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "46221:46221"
     entrypoint: ["bash", "-c", "set -a && source ./scripts/start.sh"]
     environment:
       <<: *vault-env
@@ -98,7 +111,9 @@ services:
   akatsuki-api:
     image: osuakatsuki/akatsuki-api:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "40001:40001"
     entrypoint: ["bash", "-c", "set -a && source ./scripts/start.sh"]
     environment:
       <<: *vault-env
@@ -111,7 +126,9 @@ services:
   admin-panel:
     image: osuakatsuki/admin-panel:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8086:8086"
     environment:
       <<: *vault-env
       APP_ENV: "production"
@@ -124,7 +141,9 @@ services:
   users-service:
     image: osuakatsuki/users-service:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8082:8082"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -135,7 +154,9 @@ services:
   assets-service:
     image: osuakatsuki/assets-service:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8083:8083"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -146,7 +167,9 @@ services:
   payments-service:
     image: osuakatsuki/payments-service:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8084:8084"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -157,7 +180,9 @@ services:
   profile-history-service:
     image: osuakatsuki/profile-history-service:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8085:8085"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -168,7 +193,7 @@ services:
   nachalo-konca:
     image: osuakatsuki/nachalo-konca:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -178,7 +203,9 @@ services:
   air-conditioning-service:
     image: osuakatsuki/air-conditioning-service:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8088:8088"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -189,7 +216,9 @@ services:
   rework-frontend:
     image: osuakatsuki/rework-frontend:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8089:8089"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -201,7 +230,7 @@ services:
 
   new-cron:
     image: osuakatsuki/new-cron:latest
-    network_mode: host
+    extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -213,7 +242,7 @@ services:
   ai-discord-bot:
     image: osuakatsuki/ai-discord-bot:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -223,14 +252,14 @@ services:
   management-discord-bot:
     image: osuakatsuki/management-discord-bot:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /scripts/run-bot.sh"]
     environment:
       <<: *vault-env
       APP_ENV: "production"
       APP_COMPONENT: "bot"
 
-  # === Observability ===
+  # === Observability (stays on host networking) ===
 
   grafana:
     image: grafana/grafana:latest
@@ -372,7 +401,9 @@ services:
   travelplanner-api:
     image: osuakatsuki/travelplanner-api:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8090:8090"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -382,7 +413,9 @@ services:
   travelplanner-web:
     image: osuakatsuki/travelplanner-web:latest
     restart: unless-stopped
-    network_mode: host
+    extra_hosts: *extra-hosts
+    ports:
+      - "8091:8091"
     environment:
       <<: *vault-env
       APP_ENV: "production"
