@@ -1,29 +1,29 @@
 [mysqld]
 # Networking
 bind-address = 0.0.0.0
-max_connections = 1000
+max_connections = 500
 
-# InnoDB - 40GB buffer pool for 64GB RAM system
-innodb_buffer_pool_size = 42949672960
-innodb_buffer_pool_instances = 8
+# InnoDB - 20GB buffer pool for 32GB RAM system (CX53 VPS)
+innodb_buffer_pool_size = 21474836480
+innodb_buffer_pool_instances = 4
 innodb_flush_log_at_trx_commit = 1
 innodb_flush_method = O_DIRECT
 
 # Authentication compatibility (services use mysql_native_password)
 default_authentication_plugin = mysql_native_password
 
-# I/O tuning for NVMe
-innodb_io_capacity = 10000
-innodb_io_capacity_max = 20000
-innodb_read_io_threads = 8
-innodb_write_io_threads = 8
+# I/O tuning for VPS NVMe (~18K IOPS)
+innodb_io_capacity = 2000
+innodb_io_capacity_max = 4000
+innodb_read_io_threads = 4
+innodb_write_io_threads = 4
 
 # Redo log (replaces deprecated innodb_log_file_size in 8.0.30+)
-innodb_redo_log_capacity = 2G
+innodb_redo_log_capacity = 1G
 
 # Temp tables
-tmp_table_size = 256M
-max_heap_table_size = 256M
+tmp_table_size = 128M
+max_heap_table_size = 128M
 
 # Binary logging
 log_bin = /var/log/mysql/mysql-bin.log
