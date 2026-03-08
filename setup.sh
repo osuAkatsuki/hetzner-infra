@@ -84,6 +84,11 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl restart nginx
 
+echo "=== Configuring cron jobs ==="
+cp config/cron/akatsuki /etc/cron.d/akatsuki
+chmod 644 /etc/cron.d/akatsuki
+mkdir -p /opt/akatsuki/logs
+
 echo "=== Enabling services ==="
 systemctl enable docker mysql redis-server rabbitmq-server postgresql nginx vault
 
