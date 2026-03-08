@@ -1,0 +1,4 @@
+hcloud_token         = "your-hetzner-cloud-api-token"
+cloudflare_api_token = "your-cloudflare-api-token"
+cloudflare_zone_id   = "your-cloudflare-zone-id"
+ssh_public_key       = "ssh-ed25519 AAAA... user@host"
