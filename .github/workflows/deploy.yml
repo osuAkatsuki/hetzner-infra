@@ -28,7 +28,11 @@ jobs:
 
             # Apply config changes
             cp config/mysql/99-akatsuki.cnf /etc/mysql/mysql.conf.d/99-akatsuki.cnf
+            # Ensure default mysqld.cnf doesn't override our bind-address
+            sed -i 's/^bind-address\s*=\s*127.0.0.1/bind-address = 0.0.0.0/' /etc/mysql/mysql.conf.d/mysqld.cnf
             cp config/redis/redis.conf /etc/redis/redis.conf
+            cp config/cron/akatsuki /etc/cron.d/akatsuki
+            chmod 644 /etc/cron.d/akatsuki
             cp config/vault/config.hcl /opt/vault/config.hcl
             cp config/nginx/nginx.conf /etc/nginx/nginx.conf
             cp config/nginx/sites-enabled/*.conf /etc/nginx/sites-enabled/
