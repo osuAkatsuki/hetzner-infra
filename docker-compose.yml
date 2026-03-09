@@ -10,7 +10,7 @@ services:
   # === osu! core services ===
 
   bancho-service-rs-api:
-    image: osuakatsuki/bancho-service-rs:latest
+    image: ghcr.io/osuakatsuki/bancho-service-rs:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -23,7 +23,7 @@ services:
       APP_PORT: "5001"
 
   bancho-service-rs-pubsub-daemon:
-    image: osuakatsuki/bancho-service-rs:latest
+    image: ghcr.io/osuakatsuki/bancho-service-rs:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
@@ -34,7 +34,7 @@ services:
       APP_PORT: "5001"
 
   bancho-service-rs-cleanup-cron:
-    image: osuakatsuki/bancho-service-rs:latest
+    image: ghcr.io/osuakatsuki/bancho-service-rs:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
@@ -45,7 +45,7 @@ services:
       APP_PORT: "5001"
 
   score-service:
-    image: osuakatsuki/score-service:latest
+    image: ghcr.io/osuakatsuki/score-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -58,7 +58,7 @@ services:
       APP_PORT: "7000"
 
   beatmaps-service:
-    image: osuakatsuki/beatmaps-service:latest
+    image: ghcr.io/osuakatsuki/beatmaps-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -71,7 +71,7 @@ services:
       APP_PORT: "8081"
 
   performance-service-api:
-    image: osuakatsuki/performance-service:latest
+    image: ghcr.io/osuakatsuki/performance-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -84,7 +84,7 @@ services:
       APP_PORT: "8665"
 
   performance-service-processor:
-    image: osuakatsuki/performance-service:latest
+    image: ghcr.io/osuakatsuki/performance-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -96,7 +96,7 @@ services:
   # === Web frontends ===
 
   hanayo:
-    image: osuakatsuki/hanayo:latest
+    image: ghcr.io/osuakatsuki/hanayo:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -109,7 +109,7 @@ services:
       APP_PORT: "46221"
 
   akatsuki-api:
-    image: osuakatsuki/akatsuki-api:latest
+    image: ghcr.io/osuakatsuki/akatsuki-api:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -124,7 +124,7 @@ services:
   # akatsuki-web: excluded — experimental SPA, not needed on Hetzner
 
   admin-panel:
-    image: osuakatsuki/admin-panel:latest
+    image: ghcr.io/osuakatsuki/admin-panel:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -139,7 +139,7 @@ services:
   # === Internal services ===
 
   users-service:
-    image: osuakatsuki/users-service:latest
+    image: ghcr.io/osuakatsuki/users-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -152,7 +152,7 @@ services:
       APP_PORT: "8082"
 
   assets-service:
-    image: osuakatsuki/assets-service:latest
+    image: ghcr.io/osuakatsuki/assets-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -165,7 +165,7 @@ services:
       APP_PORT: "8083"
 
   payments-service:
-    image: osuakatsuki/payments-service:latest
+    image: ghcr.io/osuakatsuki/payments-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -178,7 +178,7 @@ services:
       APP_PORT: "8084"
 
   profile-history-service:
-    image: osuakatsuki/profile-history-service:latest
+    image: ghcr.io/osuakatsuki/profile-history-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -191,7 +191,7 @@ services:
       APP_PORT: "8085"
 
   nachalo-konca:
-    image: osuakatsuki/nachalo-konca:latest
+    image: ghcr.io/osuakatsuki/nachalo-konca:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -201,7 +201,7 @@ services:
       APP_COMPONENT: "amqp-processor"
 
   air-conditioning-service:
-    image: osuakatsuki/air-conditioning-service:latest
+    image: ghcr.io/osuakatsuki/air-conditioning-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -214,7 +214,7 @@ services:
       APP_PORT: "8088"
 
   rework-frontend:
-    image: osuakatsuki/rework-frontend:latest
+    image: ghcr.io/osuakatsuki/rework-frontend:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -229,7 +229,7 @@ services:
   # === Cron jobs (triggered by host crontab, not always-running) ===
 
   new-cron:
-    image: osuakatsuki/new-cron:latest
+    image: ghcr.io/osuakatsuki/new-cron:latest
     extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
@@ -240,7 +240,7 @@ services:
   # === Discord bots ===
 
   ai-discord-bot:
-    image: osuakatsuki/ai-discord-bot:latest
+    image: ghcr.io/osuakatsuki/ai-discord-bot:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -250,7 +250,7 @@ services:
       APP_COMPONENT: "bot"
 
   management-discord-bot:
-    image: osuakatsuki/management-discord-bot:latest
+    image: ghcr.io/osuakatsuki/management-discord-bot:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     entrypoint: ["bash", "-c", "set -a && source /scripts/run-bot.sh"]
@@ -395,11 +395,12 @@ services:
       PMA_HOST: "127.0.0.1"
       PMA_PORT: "3306"
       APACHE_PORT: "8087"
+      PMA_ABSOLUTE_URI: "https://old.akatsuki.gg/phpmyadmin/"
 
   # === Non-Akatsuki ===
 
   travelplanner-api:
-    image: osuakatsuki/travelplanner-api:latest
+    image: ghcr.io/osuakatsuki/travelplanner-api:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
@@ -411,7 +412,7 @@ services:
       APP_PORT: "8090"
 
   travelplanner-web:
-    image: osuakatsuki/travelplanner-web:latest
+    image: ghcr.io/osuakatsuki/travelplanner-web:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
     ports:
