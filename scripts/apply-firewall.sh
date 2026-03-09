@@ -16,14 +16,20 @@ echo "Applying firewall rules..."
 
 iptables -F INPUT
 iptables -F OUTPUT
-iptables -F FORWARD
+# Do not flush FORWARD — Docker manages its own FORWARD chain rules
 
 iptables -P INPUT DROP
-iptables -P FORWARD DROP
+# FORWARD must be ACCEPT for Docker bridge networking (port publishing, cross-container traffic).
+# Security is enforced by INPUT DROP policy + Cloudflare-only rules.
+iptables -P FORWARD ACCEPT
 iptables -P OUTPUT ACCEPT
 
 # Loopback (all inter-service traffic)
 iptables -A INPUT -i lo -j ACCEPT
+
+# Docker bridge networks (containers reach host services via host.docker.internal)
+iptables -A INPUT -s 172.17.0.0/16 -j ACCEPT
+iptables -A INPUT -s 172.18.0.0/16 -j ACCEPT
 
 # Established/related connections
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
