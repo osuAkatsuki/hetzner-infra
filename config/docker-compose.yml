@@ -1,0 +1,432 @@
+x-vault-env: &vault-env
+  PULL_SECRETS_FROM_VAULT: "1"
+  VAULT_ADDR: "http://host.docker.internal:8200"
+  VAULT_TOKEN: "${VAULT_TOKEN}"
+
+x-extra-hosts: &extra-hosts
+  - "host.docker.internal:host-gateway"
+
+services:
+  # === osu! core services ===
+
+  bancho-service-rs-api:
+    image: ghcr.io/osuakatsuki/bancho-service-rs:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "5001:5001"
+    entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "5001"
+
+  bancho-service-rs-pubsub-daemon:
+    image: ghcr.io/osuakatsuki/bancho-service-rs:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "pubsub-daemon"
+      APP_PORT: "5001"
+
+  bancho-service-rs-cleanup-cron:
+    image: ghcr.io/osuakatsuki/bancho-service-rs:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "cleanup-cron"
+      APP_PORT: "5001"
+
+  score-service:
+    image: ghcr.io/osuakatsuki/score-service:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "7000:7000"
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "7000"
+
+  beatmaps-service:
+    image: ghcr.io/osuakatsuki/beatmaps-service:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8081:8081"
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "8081"
+
+  performance-service-api:
+    image: ghcr.io/osuakatsuki/performance-service:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8665:8665"
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "8665"
+
+  performance-service-processor:
+    image: ghcr.io/osuakatsuki/performance-service:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "processor"
+
+  # === Web frontends ===
+
+  hanayo:
+    image: ghcr.io/osuakatsuki/hanayo:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "46221:46221"
+    entrypoint: ["bash", "-c", "set -a && source ./scripts/start.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "46221"
+
+  akatsuki-api:
+    image: ghcr.io/osuakatsuki/akatsuki-api:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "40001:40001"
+    entrypoint: ["bash", "-c", "set -a && source ./scripts/start.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "40001"
+
+  # akatsuki-web: excluded — experimental SPA, not needed on Hetzner
+
+  admin-panel:
+    image: ghcr.io/osuakatsuki/admin-panel:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8086:8086"
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "8086"
+    entrypoint: ["bash", "-c", "set -a && source ./scripts/bootstrap.sh"]
+
+  # === Internal services ===
+
+  users-service:
+    image: ghcr.io/osuakatsuki/users-service:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8082:8082"
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "8082"
+
+  assets-service:
+    image: ghcr.io/osuakatsuki/assets-service:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8083:8083"
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "8083"
+
+  payments-service:
+    image: ghcr.io/osuakatsuki/payments-service:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8084:8084"
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "8084"
+
+  profile-history-service:
+    image: ghcr.io/osuakatsuki/profile-history-service:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8085:8085"
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "8085"
+
+  nachalo-konca:
+    image: ghcr.io/osuakatsuki/nachalo-konca:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "amqp-processor"
+
+  air-conditioning-service:
+    image: ghcr.io/osuakatsuki/air-conditioning-service:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8088:8088"
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "8088"
+
+  rework-frontend:
+    image: ghcr.io/osuakatsuki/rework-frontend:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8089:8089"
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "8089"
+
+  # === Cron jobs (triggered by host crontab, not always-running) ===
+
+  new-cron:
+    image: ghcr.io/osuakatsuki/new-cron:latest
+    extra_hosts: *extra-hosts
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+    profiles: ["cron"]
+
+  # === Discord bots ===
+
+  ai-discord-bot:
+    image: ghcr.io/osuakatsuki/ai-discord-bot:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "bot"
+
+  management-discord-bot:
+    image: ghcr.io/osuakatsuki/management-discord-bot:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    entrypoint: ["bash", "-c", "set -a && source /scripts/run-bot.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "bot"
+
+  # === Observability (stays on host networking) ===
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      GF_SERVER_HTTP_PORT: "3001"
+      GF_SERVER_ROOT_URL: "https://grafana.akatsuki.gg"
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD}"
+      GF_DATABASE_TYPE: "mysql"
+      GF_DATABASE_HOST: "127.0.0.1:3306"
+      GF_DATABASE_NAME: "grafana"
+      GF_DATABASE_USER: "grafana"
+      GF_DATABASE_PASSWORD: "grafana-hetzner-2026"
+      GF_INSTALL_PLUGINS: "redis-datasource"
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.size=10GB"
+      - "--storage.tsdb.min-block-duration=2h"
+      - "--storage.tsdb.max-block-duration=2h"
+      - "--web.listen-address=:9090"
+
+  thanos-sidecar:
+    image: thanosio/thanos:v0.41.0
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - prometheus-data:/prometheus:ro
+      - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
+    command:
+      - "sidecar"
+      - "--tsdb.path=/prometheus"
+      - "--prometheus.url=http://127.0.0.1:9090"
+      - "--objstore.config-file=/etc/thanos/bucket.yml"
+      - "--grpc-address=0.0.0.0:10901"
+      - "--http-address=0.0.0.0:10902"
+
+  thanos-store:
+    image: thanosio/thanos:v0.41.0
+    restart: unless-stopped
+    network_mode: host
+    user: "root"
+    volumes:
+      - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
+      - thanos-store-data:/data
+    command:
+      - "store"
+      - "--objstore.config-file=/etc/thanos/bucket.yml"
+      - "--data-dir=/data"
+      - "--grpc-address=0.0.0.0:10903"
+      - "--http-address=0.0.0.0:10904"
+
+  thanos-query:
+    image: thanosio/thanos:v0.41.0
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "query"
+      - "--endpoint=127.0.0.1:10901"
+      - "--endpoint=127.0.0.1:10903"
+      - "--http-address=0.0.0.0:10905"
+      - "--grpc-address=0.0.0.0:10906"
+
+  thanos-compactor:
+    image: thanosio/thanos:v0.41.0
+    restart: unless-stopped
+    network_mode: host
+    user: "root"
+    volumes:
+      - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
+      - thanos-compactor-data:/data
+    command:
+      - "compact"
+      - "--objstore.config-file=/etc/thanos/bucket.yml"
+      - "--data-dir=/data"
+      - "--http-address=0.0.0.0:10907"
+      - "--wait"
+      - "--retention.resolution-raw=0d"
+      - "--retention.resolution-5m=0d"
+      - "--retention.resolution-1h=0d"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "--web.listen-address=:9100"
+
+  loki:
+    image: grafana/loki:latest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      WASABI_ACCESS_KEY: "${WASABI_ACCESS_KEY}"
+      WASABI_SECRET_KEY: "${WASABI_SECRET_KEY}"
+    volumes:
+      - ./config/loki/config.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+    command:
+      - "-config.file=/etc/loki/config.yml"
+      - "-config.expand-env=true"
+
+  promtail:
+    image: grafana/promtail:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail-positions:/tmp/promtail
+    command:
+      - "-config.file=/etc/promtail/config.yml"
+
+  # === Tools ===
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PMA_HOST: "127.0.0.1"
+      PMA_PORT: "3306"
+      APACHE_PORT: "8087"
+      PMA_ABSOLUTE_URI: "https://old.akatsuki.gg/phpmyadmin/"
+
+  # === Non-Akatsuki ===
+
+  travelplanner-api:
+    image: ghcr.io/osuakatsuki/travelplanner-api:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8090:8090"
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_PORT: "8090"
+
+  travelplanner-web:
+    image: ghcr.io/osuakatsuki/travelplanner-web:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    ports:
+      - "8091:8091"
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "web"
+      APP_PORT: "8091"
+    entrypoint: ["bash", "-c", "set -a && source ./entrypoint.sh"]
+
+volumes:
+  prometheus-data:
+  thanos-compactor-data:
+  thanos-store-data:
+  loki-data:
+  promtail-positions:
