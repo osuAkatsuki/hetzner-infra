@@ -27,6 +27,7 @@ jobs:
             git checkout origin/main
 
             # Apply config changes
+            cp config/docker-compose.yml /opt/akatsuki/docker-compose.yml
             cp config/mysql/99-akatsuki.cnf /etc/mysql/mysql.conf.d/99-akatsuki.cnf
             # Ensure default mysqld.cnf doesn't override our bind-address
             sed -i 's/^bind-address\s*=\s*127.0.0.1/bind-address = 0.0.0.0/' /etc/mysql/mysql.conf.d/mysqld.cnf
