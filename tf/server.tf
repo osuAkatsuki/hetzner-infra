@@ -21,13 +21,13 @@ resource "hcloud_server" "production" {
 resource "hcloud_firewall" "production" {
   name = "akatsuki-production"
 
-  # SSH - Tailscale only
+  # SSH - open (key-based auth only, iptables also permits)
   rule {
-    description = "SSH via Tailscale"
+    description = "SSH"
     direction   = "in"
     protocol    = "tcp"
     port        = "22"
-    source_ips  = [var.tailscale_ipv4_range]
+    source_ips  = ["0.0.0.0/0", "::/0"]
   }
 
   # HTTP - Cloudflare only

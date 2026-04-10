@@ -29,7 +29,7 @@ datasources:
       maxIdleConns: 2
       connMaxLifetime: 14400
     secureJsonData:
-      password: REDACTED_GRAFANA_READONLY_PASSWORD
+      password: $GRAFANA_READONLY_PASSWORD
 
   - name: Redis
     uid: redis

@@ -274,8 +274,9 @@ services:
       GF_DATABASE_HOST: "127.0.0.1:3306"
       GF_DATABASE_NAME: "grafana"
       GF_DATABASE_USER: "grafana"
-      GF_DATABASE_PASSWORD: "REDACTED_GRAFANA_DB_PASSWORD"
+      GF_DATABASE_PASSWORD: "${GRAFANA_DB_PASSWORD}"
       GF_INSTALL_PLUGINS: "redis-datasource"
+      GRAFANA_READONLY_PASSWORD: "${GRAFANA_READONLY_PASSWORD}"
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning
 

@@ -22,12 +22,7 @@ GRAFANA_CLOUD_URL = (
     "https://prometheus-prod-32-prod-ca-east-0.grafana.net/api/prom"
 )
 GRAFANA_CLOUD_USER = "2240917"
-GRAFANA_CLOUD_TOKEN = os.environ.get(
-    "GRAFANA_CLOUD_TOKEN",
-    "REDACTED"
-    "REDACTED"
-    "REDACTED",
-)
+GRAFANA_CLOUD_TOKEN = os.environ["GRAFANA_CLOUD_TOKEN"]
 
 WORK_DIR = Path("/tmp/metrics-backfill")
 S3_BUCKET = "akatsuki.pw"
