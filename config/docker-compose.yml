@@ -33,17 +33,6 @@ services:
       APP_COMPONENT: "pubsub-daemon"
       APP_PORT: "5001"
 
-  bancho-service-rs-cleanup-cron:
-    image: ghcr.io/osuakatsuki/bancho-service-rs:latest
-    restart: unless-stopped
-    extra_hosts: *extra-hosts
-    entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
-    environment:
-      <<: *vault-env
-      APP_ENV: "production"
-      APP_COMPONENT: "cleanup-cron"
-      APP_PORT: "5001"
-
   score-service:
     image: ghcr.io/osuakatsuki/score-service:latest
     restart: unless-stopped
@@ -235,6 +224,28 @@ services:
     environment:
       <<: *vault-env
       APP_ENV: "production"
+    profiles: ["cron"]
+
+  profile-history-crawler:
+    image: ghcr.io/osuakatsuki/profile-history-service:latest
+    extra_hosts: *extra-hosts
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "crawler-cronjob"
+      APP_PORT: "8085"
+    profiles: ["cron"]
+
+  bancho-service-rs-cleanup-cron:
+    image: ghcr.io/osuakatsuki/bancho-service-rs:latest
+    extra_hosts: *extra-hosts
+    entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "cleanup-cron"
+      APP_PORT: "5001"
     profiles: ["cron"]
 
   # === Discord bots ===
