@@ -5,7 +5,10 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */30 * * * * root cd /opt/akatsuki && docker compose run --rm --no-deps new-cron >> /opt/akatsuki/logs/new-cron.log 2>&1
 
 # profile-history: snapshot user stats (daily at 00:00 UTC)
-0 0 * * * root cd /opt/akatsuki && docker compose run --rm -e APP_COMPONENT=crawler-cronjob --no-deps profile-history-service >> /opt/akatsuki/logs/profile-history-crawler.log 2>&1
+0 0 * * * root cd /opt/akatsuki && docker compose run --rm --no-deps profile-history-crawler >> /opt/akatsuki/logs/profile-history-crawler.log 2>&1
+
+# bancho-service-rs: remove dead sessions, clean up streams
+*/5 * * * * root cd /opt/akatsuki && docker compose run --rm --no-deps bancho-service-rs-cleanup-cron >> /opt/akatsuki/logs/bancho-service-rs-cleanup-cron.log 2>&1
 
 # sql-backup: dump all tables to S3 (daily at 04:00 UTC)
 0 4 * * * root cd /opt/akatsuki/sql-backup-job && ./backup.sh >> /opt/akatsuki/logs/sql-backup.log 2>&1
