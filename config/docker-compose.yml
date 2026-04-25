@@ -215,6 +215,24 @@ services:
       APP_COMPONENT: "api"
       APP_PORT: "8089"
 
+  afterburn-server:
+    image: ghcr.io/osuakatsuki/afterburn-server:latest
+    restart: unless-stopped
+    ports:
+      - "8092:8092"
+    environment:
+      NODE_ENV: "production"
+      SERVE_CLIENT: "0"
+      PORT: "8092"
+
+  afterburn-web:
+    image: ghcr.io/osuakatsuki/afterburn-web:latest
+    restart: unless-stopped
+    ports:
+      - "8093:8093"
+    environment:
+      APP_PORT: "8093"
+
   # === Cron jobs (triggered by host crontab, not always-running) ===
 
   new-cron:
