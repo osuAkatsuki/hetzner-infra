@@ -288,6 +288,16 @@ services:
       APP_ENV: "production"
       APP_COMPONENT: "bot"
 
+  akatsuki-twitch-bot:
+    image: ghcr.io/osuakatsuki/akatsuki-twitch-bot:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "bot"
+
   # === Observability (stays on host networking) ===
 
   grafana:
