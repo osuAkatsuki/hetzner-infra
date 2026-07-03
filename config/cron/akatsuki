@@ -12,3 +12,6 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # sql-backup: dump all tables to S3 (daily at 04:00 UTC)
 0 4 * * * root cd /opt/akatsuki/sql-backup-job && ./backup.sh >> /opt/akatsuki/logs/sql-backup.log 2>&1
+
+# sql-backup-retention: prune old S3 backups after the daily backup window
+0 6 * * * root cd /opt/akatsuki/sql-backup-job && ./venv/bin/python backup_retention_policy.py >> /opt/akatsuki/logs/sql-backup-retention.log 2>&1
