@@ -15,3 +15,6 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # sql-backup-retention: prune old S3 backups after the daily backup window
 0 6 * * * root cd /opt/akatsuki/sql-backup-job && ./venv/bin/python backup_retention_policy.py >> /opt/akatsuki/logs/sql-backup-retention.log 2>&1
+
+# docker: prune unused images weekly
+0 7 * * 0 root docker image prune -af --filter "until=168h" >> /opt/akatsuki/logs/docker-image-prune.log 2>&1

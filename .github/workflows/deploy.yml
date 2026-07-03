@@ -30,6 +30,14 @@ jobs:
             git clean -fd
 
             # Apply config changes
+            jq empty config/docker/daemon.json
+            mkdir -p /etc/docker
+            cp config/docker/daemon.json /etc/docker/daemon.json
+            systemctl reload docker
+            mkdir -p /etc/systemd/journald.conf.d
+            cp config/systemd/journald.conf.d/akatsuki.conf /etc/systemd/journald.conf.d/akatsuki.conf
+            systemctl restart systemd-journald
+            journalctl --vacuum-size=1G
             cp config/docker-compose.yml /opt/akatsuki/docker-compose.yml
             cp config/mysql/99-akatsuki.cnf /etc/mysql/mysql.conf.d/99-akatsuki.cnf
             # Ensure default mysqld.cnf doesn't override our bind-address
