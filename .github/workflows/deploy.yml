@@ -22,9 +22,12 @@ jobs:
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            set -euo pipefail
+
             cd /opt/akatsuki/hetzner-infra
             git fetch origin main
-            git checkout origin/main
+            git checkout -f -B main origin/main
+            git clean -fd
 
             # Apply config changes
             cp config/docker-compose.yml /opt/akatsuki/docker-compose.yml
@@ -34,6 +37,7 @@ jobs:
             cp config/redis/redis.conf /etc/redis/redis.conf
             cp config/cron/akatsuki /etc/cron.d/akatsuki
             chmod 644 /etc/cron.d/akatsuki
+            cmp config/cron/akatsuki /etc/cron.d/akatsuki
             cp config/vault/config.hcl /opt/vault/config.hcl
             cp config/nginx/nginx.conf /etc/nginx/nginx.conf
             cp config/nginx/sites-enabled/*.conf /etc/nginx/sites-enabled/
