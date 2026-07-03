@@ -6,6 +6,12 @@ x-vault-env: &vault-env
 x-extra-hosts: &extra-hosts
   - "host.docker.internal:host-gateway"
 
+x-json-log-rotation: &json-log-rotation
+  driver: json-file
+  options:
+    max-size: "100m"
+    max-file: "5"
+
 services:
   # === osu! core services ===
 
@@ -13,6 +19,7 @@ services:
     image: ghcr.io/osuakatsuki/bancho-service-rs:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "5001:5001"
     entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
@@ -26,6 +33,7 @@ services:
     image: ghcr.io/osuakatsuki/bancho-service-rs:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
     environment:
       <<: *vault-env
@@ -37,6 +45,7 @@ services:
     image: ghcr.io/osuakatsuki/score-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "7000:7000"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -50,6 +59,7 @@ services:
     image: ghcr.io/osuakatsuki/beatmaps-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8081:8081"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -63,6 +73,7 @@ services:
     image: ghcr.io/osuakatsuki/performance-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8665:8665"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -76,6 +87,7 @@ services:
     image: ghcr.io/osuakatsuki/performance-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -88,6 +100,7 @@ services:
     image: ghcr.io/osuakatsuki/hanayo:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "46221:46221"
     entrypoint: ["bash", "-c", "set -a && source ./scripts/start.sh"]
@@ -101,6 +114,7 @@ services:
     image: ghcr.io/osuakatsuki/akatsuki-api:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "40001:40001"
     entrypoint: ["bash", "-c", "set -a && source ./scripts/start.sh"]
@@ -116,6 +130,7 @@ services:
     image: ghcr.io/osuakatsuki/admin-panel:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8086:8086"
     environment:
@@ -131,6 +146,7 @@ services:
     image: ghcr.io/osuakatsuki/users-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8082:8082"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -144,6 +160,7 @@ services:
     image: ghcr.io/osuakatsuki/assets-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8083:8083"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -157,6 +174,7 @@ services:
     image: ghcr.io/osuakatsuki/payments-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8084:8084"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -170,6 +188,7 @@ services:
     image: ghcr.io/osuakatsuki/profile-history-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8085:8085"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -183,6 +202,7 @@ services:
     image: ghcr.io/osuakatsuki/nachalo-konca:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -193,6 +213,7 @@ services:
     image: ghcr.io/osuakatsuki/air-conditioning-service:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8088:8088"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -206,6 +227,7 @@ services:
     image: ghcr.io/osuakatsuki/rework-frontend:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8089:8089"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -218,6 +240,7 @@ services:
   afterburn-server:
     image: ghcr.io/osuakatsuki/afterburn-server:latest
     restart: unless-stopped
+    logging: *json-log-rotation
     ports:
       - "8092:8092"
     environment:
@@ -228,6 +251,7 @@ services:
   afterburn-web:
     image: ghcr.io/osuakatsuki/afterburn-web:latest
     restart: unless-stopped
+    logging: *json-log-rotation
     ports:
       - "8093:8093"
     environment:
@@ -238,6 +262,7 @@ services:
   new-cron:
     image: ghcr.io/osuakatsuki/new-cron:latest
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -247,6 +272,7 @@ services:
   profile-history-crawler:
     image: ghcr.io/osuakatsuki/profile-history-service:latest
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -258,6 +284,7 @@ services:
   bancho-service-rs-cleanup-cron:
     image: ghcr.io/osuakatsuki/bancho-service-rs:latest
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
     environment:
       <<: *vault-env
@@ -272,6 +299,7 @@ services:
     image: ghcr.io/osuakatsuki/ai-discord-bot:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -282,6 +310,7 @@ services:
     image: ghcr.io/osuakatsuki/management-discord-bot:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     entrypoint: ["bash", "-c", "set -a && source /scripts/run-bot.sh"]
     environment:
       <<: *vault-env
@@ -292,6 +321,7 @@ services:
     image: ghcr.io/osuakatsuki/akatsuki-twitch-bot:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
     environment:
       <<: *vault-env
@@ -304,6 +334,7 @@ services:
     image: grafana/grafana:latest
     restart: unless-stopped
     network_mode: host
+    logging: *json-log-rotation
     environment:
       GF_SERVER_HTTP_PORT: "3001"
       GF_SERVER_ROOT_URL: "https://grafana.akatsuki.gg"
@@ -323,6 +354,7 @@ services:
     image: prom/prometheus:latest
     restart: unless-stopped
     network_mode: host
+    logging: *json-log-rotation
     volumes:
       - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -337,6 +369,7 @@ services:
     image: thanosio/thanos:v0.41.0
     restart: unless-stopped
     network_mode: host
+    logging: *json-log-rotation
     volumes:
       - prometheus-data:/prometheus:ro
       - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
@@ -352,6 +385,7 @@ services:
     image: thanosio/thanos:v0.41.0
     restart: unless-stopped
     network_mode: host
+    logging: *json-log-rotation
     user: "root"
     volumes:
       - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
@@ -367,6 +401,7 @@ services:
     image: thanosio/thanos:v0.41.0
     restart: unless-stopped
     network_mode: host
+    logging: *json-log-rotation
     command:
       - "query"
       - "--endpoint=127.0.0.1:10901"
@@ -378,6 +413,7 @@ services:
     image: thanosio/thanos:v0.41.0
     restart: unless-stopped
     network_mode: host
+    logging: *json-log-rotation
     user: "root"
     volumes:
       - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
@@ -396,6 +432,7 @@ services:
     image: prom/node-exporter:latest
     restart: unless-stopped
     network_mode: host
+    logging: *json-log-rotation
     command:
       - "--web.listen-address=:9100"
 
@@ -403,6 +440,7 @@ services:
     image: grafana/loki:latest
     restart: unless-stopped
     network_mode: host
+    logging: *json-log-rotation
     environment:
       WASABI_ACCESS_KEY: "${WASABI_ACCESS_KEY}"
       WASABI_SECRET_KEY: "${WASABI_SECRET_KEY}"
@@ -417,6 +455,7 @@ services:
     image: grafana/promtail:latest
     restart: unless-stopped
     network_mode: host
+    logging: *json-log-rotation
     volumes:
       - ./config/promtail/config.yml:/etc/promtail/config.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -431,6 +470,7 @@ services:
     image: phpmyadmin/phpmyadmin:latest
     restart: unless-stopped
     network_mode: host
+    logging: *json-log-rotation
     environment:
       PMA_HOST: "127.0.0.1"
       PMA_PORT: "3306"
@@ -443,6 +483,7 @@ services:
     image: ghcr.io/osuakatsuki/travelplanner-api:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8090:8090"
     entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
@@ -455,6 +496,7 @@ services:
     image: ghcr.io/osuakatsuki/travelplanner-web:latest
     restart: unless-stopped
     extra_hosts: *extra-hosts
+    logging: *json-log-rotation
     ports:
       - "8091:8091"
     environment:

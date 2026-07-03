@@ -22,12 +22,6 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl jq
 pip3 install --break-system-packages awscli
 
-echo "=== Configuring Docker ==="
-jq empty config/docker/daemon.json
-mkdir -p /etc/docker
-cp config/docker/daemon.json /etc/docker/daemon.json
-systemctl restart docker
-
 echo "=== Configuring journald ==="
 mkdir -p /etc/systemd/journald.conf.d
 cp config/systemd/journald.conf.d/akatsuki.conf /etc/systemd/journald.conf.d/akatsuki.conf
