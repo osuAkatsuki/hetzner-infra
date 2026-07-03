@@ -22,6 +22,12 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl jq
 pip3 install --break-system-packages awscli
 
+echo "=== Configuring journald ==="
+mkdir -p /etc/systemd/journald.conf.d
+cp config/systemd/journald.conf.d/akatsuki.conf /etc/systemd/journald.conf.d/akatsuki.conf
+systemctl restart systemd-journald
+journalctl --vacuum-size=1G
+
 echo "=== Installing HashiCorp Vault ==="
 wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
