@@ -30,6 +30,9 @@ jobs:
             git clean -fd
 
             # Apply config changes
+            install -D -m 0644 config/apt/apt.conf.d/99-akatsuki-periodic-upgrades /etc/apt/apt.conf.d/99-akatsuki-periodic-upgrades
+            apt-config dump | grep -Fqx 'APT::Periodic::Update-Package-Lists "0";'
+            apt-config dump | grep -Fqx 'APT::Periodic::Unattended-Upgrade "0";'
             mkdir -p /etc/systemd/journald.conf.d
             cp config/systemd/journald.conf.d/akatsuki.conf /etc/systemd/journald.conf.d/akatsuki.conf
             systemctl restart systemd-journald
