@@ -31,8 +31,8 @@ jobs:
 
             # Apply config changes
             install -D -m 0644 config/apt/apt.conf.d/99-akatsuki-periodic-upgrades /etc/apt/apt.conf.d/99-akatsuki-periodic-upgrades
-            apt-config dump | grep -Fqx 'APT::Periodic::Update-Package-Lists "0";'
-            apt-config dump | grep -Fqx 'APT::Periodic::Unattended-Upgrade "0";'
+            test "$(apt-config shell UPDATE_PACKAGE_LISTS APT::Periodic::Update-Package-Lists)" = "UPDATE_PACKAGE_LISTS='0'"
+            test "$(apt-config shell UNATTENDED_UPGRADE APT::Periodic::Unattended-Upgrade)" = "UNATTENDED_UPGRADE='0'"
             mkdir -p /etc/systemd/journald.conf.d
             cp config/systemd/journald.conf.d/akatsuki.conf /etc/systemd/journald.conf.d/akatsuki.conf
             systemctl restart systemd-journald
