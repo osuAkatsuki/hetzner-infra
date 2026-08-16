@@ -11,6 +11,9 @@ mkswap /swapfile
 swapon /swapfile
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
+echo "=== Configuring automatic upgrades ==="
+install -D -m 0644 config/apt/apt.conf.d/99-akatsuki-periodic-upgrades /etc/apt/apt.conf.d/99-akatsuki-periodic-upgrades
+
 echo "=== Installing system packages ==="
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
