@@ -87,6 +87,7 @@ done
 
 echo "=== Configuring nginx ==="
 cp config/nginx/nginx.conf /etc/nginx/nginx.conf
+cp config/nginx/robots.txt /etc/nginx/robots.txt
 rm -rf /etc/nginx/sites-enabled/*
 cp config/nginx/sites-enabled/*.conf /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default

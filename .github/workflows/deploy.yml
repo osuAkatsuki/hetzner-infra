@@ -47,6 +47,7 @@ jobs:
             cmp config/cron/akatsuki /etc/cron.d/akatsuki
             cp config/vault/config.hcl /opt/vault/config.hcl
             cp config/nginx/nginx.conf /etc/nginx/nginx.conf
+            cp config/nginx/robots.txt /etc/nginx/robots.txt
             cp config/nginx/sites-enabled/*.conf /etc/nginx/sites-enabled/
 
             # Validate and reload nginx
