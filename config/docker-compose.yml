@@ -370,12 +370,14 @@ services:
     restart: unless-stopped
     network_mode: host
     logging: *json-log-rotation
+    # Same user as Prometheus: the shipper writes its upload state into the TSDB dir
+    user: "65534:65534"
     volumes:
-      - prometheus-data:/prometheus:ro
+      - prometheus-data:/prometheus
       - ./config/thanos/bucket.yml:/etc/thanos/bucket.yml:ro
     command:
       - "sidecar"
-      - "--tsdb.path=/prometheus"
+      - "--tsdb.path=/prometheus/data"
       - "--prometheus.url=http://127.0.0.1:9090"
       - "--objstore.config-file=/etc/thanos/bucket.yml"
       - "--grpc-address=0.0.0.0:10901"
