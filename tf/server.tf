@@ -16,6 +16,11 @@ resource "hcloud_server" "production" {
     environment = "production"
     project     = "akatsuki"
   }
+
+  # CI applies this config; never let it delete or replace the production server
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "hcloud_firewall" "production" {

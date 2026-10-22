@@ -177,7 +177,7 @@ Application images are built and deployed from each service's own repo; their de
 
 ## Rebuilding the server
 
-1. **Terraform** (`tf/`): copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in. State lives in the `akatsuki-terraform-state` Wasabi bucket, so export Wasabi credentials as `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. Then `terraform init && terraform apply` creates the server, its firewall, and the DNS records.
+1. **Terraform** (`tf/`) creates the server, its firewall, and the DNS records. It runs in CI (`.github/workflows/terraform.yml`): pull requests that touch `tf/` get a plan, and merges to `main` apply it, using the repository secrets `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `SSH_PUBLIC_KEY`, and `WASABI_ACCESS_KEY` / `WASABI_SECRET_KEY` (the state bucket). DNS records point at the server's address, so a new server updates them. The server has `prevent_destroy`, so CI can never delete or replace it.
 2. **Origin certificate**: install the Cloudflare origin certificate at `/etc/ssl/certs/akatsuki-origin.pem` and its key at `/etc/ssl/private/akatsuki-origin.key`.
 3. **Bootstrap**: clone this repo to `/opt/akatsuki/hetzner-infra`, create `.env` from `.env.example`, then run `set -a && source .env && set +a && ./setup.sh`.
 4. Follow the manual steps `setup.sh` prints at the end (unseal Vault, create `/opt/akatsuki/.env`, restore MySQL, start services).
