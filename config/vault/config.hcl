@@ -1,6 +1,6 @@
+# Credentials come from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in /etc/vault.d/vault.env,
+# which the vault package's systemd unit loads.
 storage "s3" {
-  access_key = "${VAULT_S3_ACCESS_KEY}"
-  secret_key = "${VAULT_S3_SECRET_KEY}"
   bucket = "akatsuki.pw"
   endpoint = "https://s3.ca-central-1.wasabisys.com"
   region = "ca-central-1"

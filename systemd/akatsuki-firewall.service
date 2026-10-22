@@ -1,0 +1,14 @@
+[Unit]
+Description=Akatsuki host firewall (scripts/apply-firewall.sh)
+DefaultDependencies=no
+After=local-fs.target
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /opt/akatsuki/hetzner-infra/scripts/apply-firewall.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -53,22 +53,4 @@ resource "hcloud_firewall" "production" {
       source_ips  = rule.value
     }
   }
-
-  # Vault UI - Tailscale only
-  rule {
-    description = "Vault via Tailscale"
-    direction   = "in"
-    protocol    = "tcp"
-    port        = "8200"
-    source_ips  = [var.tailscale_ipv4_range]
-  }
-
-  # Grafana - Tailscale only
-  rule {
-    description = "Grafana via Tailscale"
-    direction   = "in"
-    protocol    = "tcp"
-    port        = "3001"
-    source_ips  = [var.tailscale_ipv4_range]
-  }
 }

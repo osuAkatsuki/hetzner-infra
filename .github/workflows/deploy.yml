@@ -44,17 +44,21 @@ jobs:
             cp config/cron/akatsuki /etc/cron.d/akatsuki
             chmod 644 /etc/cron.d/akatsuki
             cmp config/cron/akatsuki /etc/cron.d/akatsuki
-            cp config/vault/config.hcl /opt/vault/config.hcl
+            cp config/vault/config.hcl /etc/vault.d/vault.hcl
             cp config/nginx/nginx.conf /etc/nginx/nginx.conf
             cp config/nginx/robots.txt /etc/nginx/robots.txt
-            cp config/nginx/sites-enabled/*.conf /etc/nginx/sites-enabled/
+            # Mirror the directory so sites removed from the repo are removed from the host
+            rsync -a --delete config/nginx/sites-enabled/ /etc/nginx/sites-enabled/
 
             # Validate and reload nginx
             nginx -t
             systemctl reload nginx
 
-            # Apply firewall rules
+            # Apply firewall rules, and re-apply them at boot
             bash scripts/apply-firewall.sh
+            install -m 0644 systemd/akatsuki-firewall.service /etc/systemd/system/akatsuki-firewall.service
+            systemctl daemon-reload
+            systemctl enable akatsuki-firewall.service
 
             # Restart data services only if their configs changed. Redis is copied and restarted in
             # one step so a deploy that fails in between can't leave a new config on disk unapplied.
@@ -68,3 +72,15 @@ jobs:
             # that are stopped. Cron services are profile-gated and stay off. This doesn't pull
             # images; each app's own deploy pulls its image.
             docker compose -f /opt/akatsuki/docker-compose.yml up -d
+
+            # Compose doesn't track the contents of mounted config files (e.g. prometheus.yml), so
+            # restart any container whose mounted repo config changed after the container started.
+            for name in $(docker compose -f /opt/akatsuki/docker-compose.yml ps --format '{{.Name}}'); do
+              started=$(docker inspect -f '{{.State.StartedAt}}' "$name")
+              for src in $(docker inspect -f '{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}} {{end}}{{end}}' "$name"); do
+                if [[ $src == /opt/akatsuki/config/* ]] && [ -n "$(find "$src" -newermt "$started" -print -quit)" ]; then
+                  docker restart "$name"
+                  break
+                fi
+              done
+            done
