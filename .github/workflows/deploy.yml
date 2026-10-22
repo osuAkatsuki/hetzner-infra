@@ -41,7 +41,6 @@ jobs:
             cp config/mysql/99-akatsuki.cnf /etc/mysql/mysql.conf.d/99-akatsuki.cnf
             # Ensure default mysqld.cnf doesn't override our bind-address
             sed -i 's/^bind-address\s*=\s*127.0.0.1/bind-address = 0.0.0.0/' /etc/mysql/mysql.conf.d/mysqld.cnf
-            cp config/redis/redis.conf /etc/redis/redis.conf
             cp config/cron/akatsuki /etc/cron.d/akatsuki
             chmod 644 /etc/cron.d/akatsuki
             cmp config/cron/akatsuki /etc/cron.d/akatsuki
@@ -57,8 +56,12 @@ jobs:
             # Apply firewall rules
             bash scripts/apply-firewall.sh
 
-            # Restart data services only if their configs changed
-            systemctl restart redis-server
+            # Restart data services only if their configs changed. Redis is copied and restarted in
+            # one step so a deploy that fails in between can't leave a new config on disk unapplied.
+            if ! cmp -s config/redis/redis.conf /etc/redis/redis.conf; then
+              cp config/redis/redis.conf /etc/redis/redis.conf
+              systemctl restart redis-server
+            fi
             # MySQL and Vault require manual restart for safety
 
             # Apply docker-compose.yml: recreates containers whose config changed and starts any
