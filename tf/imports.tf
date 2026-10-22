@@ -49,8 +49,8 @@ locals {
   }
 
   imported_atproto_record_ids = {
-    "_atproto.akatsuki.gg"         = "043b6f539964fe6c03ca4235cc2484d3"
-    "_atproto.mistral.akatsuki.gg" = "1b0ec73f215ffc46fe6236cc7dacba78"
+    "_atproto"         = "043b6f539964fe6c03ca4235cc2484d3"
+    "_atproto.mistral" = "1b0ec73f215ffc46fe6236cc7dacba78"
   }
 }
 
