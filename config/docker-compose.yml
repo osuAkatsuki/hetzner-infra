@@ -469,7 +469,7 @@ services:
   # === Tools ===
 
   phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest
+    image: phpmyadmin:latest
     restart: unless-stopped
     network_mode: host
     logging: *json-log-rotation
