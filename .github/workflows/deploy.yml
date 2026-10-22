@@ -60,3 +60,8 @@ jobs:
             # Restart data services only if their configs changed
             systemctl restart redis-server
             # MySQL and Vault require manual restart for safety
+
+            # Apply docker-compose.yml: recreates containers whose config changed and starts any
+            # that are stopped. Cron services are profile-gated and stay off. This doesn't pull
+            # images; each app's own deploy pulls its image.
+            docker compose -f /opt/akatsuki/docker-compose.yml up -d
