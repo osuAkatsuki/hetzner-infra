@@ -31,8 +31,8 @@ chunk_store_config:
 schema_config:
   configs:
     # This period's prefix contains slashes, which the compactor can't parse as a table name
-    # (it sees one table called "observability"), so its tables are never compacted. Later
-    # periods use a prefix without slashes.
+    # (it sees one table called "observability"), so its tables are never compacted and retention
+    # never deletes their logs. Later periods use a prefix without slashes.
     - from: "2024-01-01"
       store: tsdb
       object_store: aws
@@ -50,9 +50,15 @@ schema_config:
 
 limits_config:
   max_query_length: 0
-  retention_period: 0
+  retention_period: 8760h # 1 year
+  retention_stream:
+    # nginx access logs hold visitors' IP addresses
+    - selector: '{job="nginx"}'
+      priority: 1
+      period: 2160h # 90 days
 
 compactor:
   working_directory: /loki/compactor
   compaction_interval: 10m
-  retention_enabled: false
+  retention_enabled: true
+  delete_request_store: aws

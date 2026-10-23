@@ -409,6 +409,8 @@ services:
       - "query"
       - "--endpoint=127.0.0.1:10901"
       - "--endpoint=127.0.0.1:10903"
+      # Read the 5m/1h averages where full-resolution data has expired
+      - "--query.auto-downsampling"
       - "--http-address=0.0.0.0:10905"
       - "--grpc-address=0.0.0.0:10906"
 
@@ -427,9 +429,10 @@ services:
       - "--data-dir=/data"
       - "--http-address=0.0.0.0:10907"
       - "--wait"
-      - "--retention.resolution-raw=0d"
-      - "--retention.resolution-5m=0d"
-      - "--retention.resolution-1h=0d"
+      # Full-resolution metrics for 90 days, 5-minute averages for a year, hourly averages for 2 years
+      - "--retention.resolution-raw=90d"
+      - "--retention.resolution-5m=365d"
+      - "--retention.resolution-1h=730d"
 
   node-exporter:
     image: prom/node-exporter:latest
