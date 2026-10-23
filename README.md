@@ -182,6 +182,7 @@ Application images are built and deployed from each service's own repo; their de
 2. **Origin certificate**: install the Cloudflare origin certificate at `/etc/ssl/certs/akatsuki-origin.pem` and its key at `/etc/ssl/private/akatsuki-origin.key`.
 3. **Bootstrap**: clone this repo to `/opt/akatsuki/hetzner-infra`, create `.env` from `.env.example`, then run `set -a && source .env && set +a && ./setup.sh`.
 4. Follow the manual steps `setup.sh` prints at the end (unseal Vault, create `/opt/akatsuki/.env`, restore MySQL, start services).
+   Backups contain the `akatsuki` database but not MySQL's accounts, so recreate those by hand after restoring. Each service's password is in its Vault entry.
 
 Secrets are kept out of the repo, in these files on the host:
 
