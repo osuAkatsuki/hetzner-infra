@@ -1,0 +1,152 @@
+// Collects logs into Loki and MySQL/Redis metrics into Prometheus. Runs on the host network,
+// so 127.0.0.1 is the host.
+
+// === Logs ===
+
+loki.write "local" {
+	endpoint {
+		url = "http://127.0.0.1:3100/loki/api/v1/push"
+	}
+}
+
+// Containers in the akatsuki compose project
+discovery.docker "containers" {
+	host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "containers" {
+	targets = discovery.docker.containers.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "container"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		target_label  = "service"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+		target_label  = "project"
+	}
+
+	rule {
+		source_labels = ["project"]
+		regex         = "akatsuki"
+		action        = "keep"
+	}
+}
+
+loki.source.docker "containers" {
+	host       = "unix:///var/run/docker.sock"
+	targets    = discovery.relabel.containers.output
+	forward_to = [loki.write.local.receiver]
+}
+
+// systemd journal: Vault, Docker, RabbitMQ, sshd, cron, and the rest of the host
+loki.relabel "journal" {
+	forward_to = []
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		target_label  = "unit"
+	}
+
+	rule {
+		source_labels = ["__journal_priority_keyword"]
+		target_label  = "level"
+	}
+}
+
+loki.source.journal "host" {
+	relabel_rules = loki.relabel.journal.rules
+	labels        = {job = "systemd-journal"}
+	forward_to    = [loki.write.local.receiver]
+}
+
+// Host services that log to files instead of the journal
+local.file_match "host_files" {
+	path_targets = [
+		{"__path__" = "/var/log/nginx/access.log", "job" = "nginx", "log" = "access"},
+		{"__path__" = "/var/log/nginx/error.log", "job" = "nginx", "log" = "error"},
+		{"__path__" = "/var/log/redis/redis-server.log", "job" = "redis"},
+		{"__path__" = "/var/log/postgresql/postgresql-*-main.log", "job" = "postgresql"},
+	]
+}
+
+loki.source.file "host_files" {
+	targets       = local.file_match.host_files.targets
+	tail_from_end = true
+	forward_to    = [loki.write.local.receiver]
+}
+
+// MySQL error log, labelled the way the "MySQL logs" dashboard filters it
+local.file_match "mysql" {
+	path_targets = [
+		{"__path__" = "/var/log/mysql/error.log", "job" = "integrations/mysql", "instance" = "akatsuki-production"},
+	]
+}
+
+loki.source.file "mysql" {
+	targets    = local.file_match.mysql.targets
+	forward_to = [loki.process.mysql.receiver]
+}
+
+// Lines look like: 2026-10-22T18:00:00.123456Z 0 [Warning] [MY-010055] [Server] ...
+loki.process "mysql" {
+	stage.regex {
+		expression = `^(?P<time>\S+) \d+ \[(?P<level>[^\]]+)\] \[(?P<err_code>[^\]]+)\] \[(?P<subsystem>[^\]]+)\]`
+	}
+
+	stage.timestamp {
+		source = "time"
+		format = "RFC3339Nano"
+	}
+
+	stage.labels {
+		values = {
+			level     = "",
+			err_code  = "",
+			subsystem = "",
+		}
+	}
+
+	forward_to = [loki.write.local.receiver]
+}
+
+// === Metrics ===
+
+prometheus.exporter.mysql "default" {
+	data_source_name = "alloy:" + sys.env("MYSQL_EXPORTER_PASSWORD") + "@(127.0.0.1:3306)/"
+}
+
+prometheus.exporter.redis "default" {
+	redis_addr = "127.0.0.1:6379"
+}
+
+discovery.relabel "exporters" {
+	targets = array.concat(
+		prometheus.exporter.mysql.default.targets,
+		prometheus.exporter.redis.default.targets,
+	)
+
+	rule {
+		target_label = "instance"
+		replacement  = "akatsuki-production"
+	}
+}
+
+prometheus.scrape "exporters" {
+	targets    = discovery.relabel.exporters.output
+	forward_to = [prometheus.remote_write.local.receiver]
+}
+
+// Requires Prometheus' --web.enable-remote-write-receiver
+prometheus.remote_write "local" {
+	endpoint {
+		url = "http://127.0.0.1:9090/api/v1/write"
+	}
+}
