@@ -363,7 +363,7 @@ services:
       - "--storage.tsdb.retention.size=10GB"
       - "--storage.tsdb.min-block-duration=2h"
       - "--storage.tsdb.max-block-duration=2h"
-      - "--web.listen-address=:9090"
+      - "--web.listen-address=127.0.0.1:9090"
       - "--web.enable-remote-write-receiver"
 
   thanos-sidecar:
