@@ -56,6 +56,9 @@ limits_config:
     - selector: '{job="nginx"}'
       priority: 1
       period: 2160h # 90 days
+  # Retention still runs; this only rejects on-demand deletes through /loki/api/v1/delete, which
+  # anything that can reach Loki could otherwise use to erase logs
+  deletion_mode: disabled
 
 compactor:
   working_directory: /loki/compactor
