@@ -15,6 +15,10 @@ concurrency:
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.WASABI_ACCESS_KEY }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.WASABI_SECRET_KEY }}
+  TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+  TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+  TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
 
 jobs:
   terraform-plan:
@@ -25,6 +29,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      # This repo is public and Cloudflare proxying exists to hide the server's addresses, so keep
+      # them out of logs, the job summary, and PR comments. Fails rather than continue unmasked.
+      - name: Hide Server Addresses
+        run: |
+          set -euo pipefail
+          addresses=$(curl -sf -H "Authorization: Bearer $TF_VAR_hcloud_token" https://api.hetzner.cloud/v1/servers \
+            | jq -r '.servers[].public_net | .ipv4.ip, (.ipv6.ip | split("::")[0])')
+          test -n "$addresses"
+          for address in $addresses; do echo "::add-mask::$address"; done
+          echo "SERVER_ADDRESSES=$(echo $addresses)" >> "$GITHUB_ENV"
 
       - uses: hashicorp/setup-terraform@v4
         with:
@@ -41,11 +56,6 @@ jobs:
       - name: Terraform Plan
         id: tf-plan
         working-directory: ./tf
-        env:
-          TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
-          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
         run: |
           export exitcode=0
           terraform plan \
@@ -64,16 +74,14 @@ jobs:
             exit 0
           fi
 
-      - uses: actions/upload-artifact@v7
-        with:
-          name: tfplan
-          path: tf/tfplan
-
       - name: Create Plan Summary
         id: tf-plan-string
         working-directory: ./tf
         run: |
           TERRAFORM_PLAN=$(terraform show -no-color tfplan)
+          for address in $SERVER_ADDRESSES; do
+            TERRAFORM_PLAN=${TERRAFORM_PLAN//$address/<server address>}
+          done
 
           delimiter="$(openssl rand -hex 8)"
           {
@@ -118,17 +126,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Hide Server Addresses
+        run: |
+          set -euo pipefail
+          addresses=$(curl -sf -H "Authorization: Bearer $TF_VAR_hcloud_token" https://api.hetzner.cloud/v1/servers \
+            | jq -r '.servers[].public_net | .ipv4.ip, (.ipv6.ip | split("::")[0])')
+          test -n "$addresses"
+          for address in $addresses; do echo "::add-mask::$address"; done
+
       - uses: hashicorp/setup-terraform@v4
 
       - name: Terraform Init
         working-directory: ./tf
         run: terraform init
 
-      - uses: actions/download-artifact@v8
-        with:
-          name: tfplan
-          path: tf
-
+      # Plan files contain the values of sensitive variables, so plan and apply here instead of
+      # passing a plan file from the plan job as an artifact (which public repos expose).
       - name: Terraform Apply
         working-directory: ./tf
-        run: terraform apply -auto-approve -lock-timeout=5m tfplan
+        run: terraform apply -auto-approve -lock-timeout=5m

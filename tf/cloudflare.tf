@@ -1,112 +1,98 @@
-# Phase 2: Uncomment after data migration is complete and records are imported.
-#
-# Import existing records first to avoid duplicates:
-#   terraform import cloudflare_record.apex <record_id>
-#   terraform import 'cloudflare_record.cname["a"]' <record_id>
-#   ... (for each CNAME and MX record)
-#
-# Get record IDs with:
-#   curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-#     "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" | jq '.result[]'
+# Record names are relative to their zone, as the Cloudflare provider stores them
 
-# resource "cloudflare_record" "apex" {
-#   zone_id = var.cloudflare_zone_id
-#   name    = "akatsuki.gg"
-#   type    = "A"
-#   value   = hcloud_server.production.ipv4_address
-#   proxied = true
-#   ttl     = 1
-# }
-#
-# locals {
-#   cname_subdomains = [
-#     "a",
-#     "air_conditioning",
-#     "assets",
-#     "b",
-#     "beatmaps",
-#     "c",
-#     "difficulty",
-#     "old",
-#     "osu",
-#     "payments",
-#     "performance",
-#     "relax",
-#     "rework",
-#     "reworks",
-#     "s",
-#     "vault",
-#     "www",
-#   ]
-# }
-#
-# resource "cloudflare_record" "cname" {
-#   for_each = toset(local.cname_subdomains)
-#
-#   zone_id = var.cloudflare_zone_id
-#   name    = each.value
-#   type    = "CNAME"
-#   value   = "akatsuki.gg"
-#   proxied = true
-#   ttl     = 1
-# }
-#
-# resource "cloudflare_record" "mx_primary" {
-#   zone_id  = var.cloudflare_zone_id
-#   name     = "akatsuki.gg"
-#   type     = "MX"
-#   value    = "aspmx.l.google.com"
-#   priority = 1
-#   proxied  = false
-#   ttl      = 1
-# }
-#
-# resource "cloudflare_record" "mx_alt1" {
-#   zone_id  = var.cloudflare_zone_id
-#   name     = "akatsuki.gg"
-#   type     = "MX"
-#   value    = "alt1.aspmx.l.google.com"
-#   priority = 5
-#   proxied  = false
-#   ttl      = 1
-# }
-#
-# resource "cloudflare_record" "mx_alt2" {
-#   zone_id  = var.cloudflare_zone_id
-#   name     = "akatsuki.gg"
-#   type     = "MX"
-#   value    = "alt2.aspmx.l.google.com"
-#   priority = 5
-#   proxied  = false
-#   ttl      = 1
-# }
-#
-# resource "cloudflare_record" "mx_alt3" {
-#   zone_id  = var.cloudflare_zone_id
-#   name     = "akatsuki.gg"
-#   type     = "MX"
-#   value    = "alt3.aspmx.l.google.com"
-#   priority = 10
-#   proxied  = false
-#   ttl      = 1
-# }
-#
-# resource "cloudflare_record" "mx_alt4" {
-#   zone_id  = var.cloudflare_zone_id
-#   name     = "akatsuki.gg"
-#   type     = "MX"
-#   value    = "alt4.aspmx.l.google.com"
-#   priority = 10
-#   proxied  = false
-#   ttl      = 1
-# }
-#
-# resource "cloudflare_record" "mx_verification" {
-#   zone_id  = var.cloudflare_zone_id
-#   name     = "akatsuki.gg"
-#   type     = "MX"
-#   value    = "3h5azgn53tixa3a2yxyqkgyethll22hdjl7jj5jshsfw2wpalkhq.mx-verification.google.com"
-#   priority = 15
-#   proxied  = false
-#   ttl      = 1
-# }
+locals {
+  cmyui_xyz_zone_id = "3d498eac702151a0b0dbd5b4509f97be"
+
+  # akatsuki.gg subdomains that CNAME to the apex
+  cname_subdomains = toset([
+    "a",
+    "afterburn",
+    "air_conditioning",
+    "assets",
+    "b",
+    "beatmaps",
+    "c",
+    "grafana",
+    "old",
+    "osu",
+    "payments",
+    "performance",
+    "rework",
+    "reworks",
+    "s",
+    "users",
+    "vault",
+    "www",
+  ])
+
+  # Google Workspace mail servers and their priorities
+  mx_records = {
+    "aspmx.l.google.com"                                                              = 1
+    "alt1.aspmx.l.google.com"                                                         = 5
+    "alt2.aspmx.l.google.com"                                                         = 5
+    "alt3.aspmx.l.google.com"                                                         = 10
+    "alt4.aspmx.l.google.com"                                                         = 10
+    "3h5azgn53tixa3a2yxyqkgyethll22hdjl7jj5jshsfw2wpalkhq.mx-verification.google.com" = 15
+  }
+
+  # Bluesky handle verification
+  atproto_records = {
+    "_atproto"         = "did=did:plc:dgkcb7osp25n3rmnhm4goscz"
+    "_atproto.mistral" = "did=did:plc:qjrg33jx6yesuihpvkn3bilj"
+  }
+}
+
+# Proxied records keep the server's address behind Cloudflare
+
+resource "cloudflare_record" "apex" {
+  zone_id = var.cloudflare_zone_id
+  name    = "akatsuki.gg"
+  type    = "A"
+  content = hcloud_server.production.ipv4_address
+  proxied = true
+  ttl     = 1
+}
+
+resource "cloudflare_record" "cname" {
+  for_each = local.cname_subdomains
+
+  zone_id = var.cloudflare_zone_id
+  name    = each.value
+  type    = "CNAME"
+  content = "akatsuki.gg"
+  proxied = true
+  ttl     = 1
+}
+
+resource "cloudflare_record" "mx" {
+  for_each = local.mx_records
+
+  zone_id  = var.cloudflare_zone_id
+  name     = "akatsuki.gg"
+  type     = "MX"
+  content  = each.key
+  priority = each.value
+  proxied  = false
+  ttl      = 1
+}
+
+resource "cloudflare_record" "atproto" {
+  for_each = local.atproto_records
+
+  zone_id = var.cloudflare_zone_id
+  name    = each.key
+  type    = "TXT"
+  content = "\"${each.value}\""
+  proxied = false
+  ttl     = 1
+}
+
+# Only this cmyui.xyz record points at the server; the rest of the zone is unmanaged
+resource "cloudflare_record" "travel_cmyui_xyz" {
+  zone_id = local.cmyui_xyz_zone_id
+  name    = "travel"
+  type    = "A"
+  content = hcloud_server.production.ipv4_address
+  proxied = true
+  ttl     = 1
+}

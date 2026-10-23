@@ -16,6 +16,11 @@ resource "hcloud_server" "production" {
     environment = "production"
     project     = "akatsuki"
   }
+
+  # CI applies this config; never let it delete or replace the production server
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "hcloud_firewall" "production" {
@@ -52,23 +57,5 @@ resource "hcloud_firewall" "production" {
       port        = "443"
       source_ips  = rule.value
     }
-  }
-
-  # Vault UI - Tailscale only
-  rule {
-    description = "Vault via Tailscale"
-    direction   = "in"
-    protocol    = "tcp"
-    port        = "8200"
-    source_ips  = [var.tailscale_ipv4_range]
-  }
-
-  # Grafana - Tailscale only
-  rule {
-    description = "Grafana via Tailscale"
-    direction   = "in"
-    protocol    = "tcp"
-    port        = "3001"
-    source_ips  = [var.tailscale_ipv4_range]
   }
 }

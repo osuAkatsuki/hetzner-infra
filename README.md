@@ -2,24 +2,25 @@
 
 Infrastructure configuration for [akatsuki.gg](https://akatsuki.gg), an osu! private server.
 
-This repo contains the production docker-compose, nginx configs, Terraform definitions, Grafana provisioning, and server bootstrap scripts.
+This repo contains the production docker-compose, nginx configs, Terraform definitions, Grafana provisioning, and server bootstrap scripts. It is meant to describe the whole production host: Terraform creates the server, firewall, and DNS records, `setup.sh` provisions a fresh server, and CI keeps the host in sync with `main`.
 
 ## Repository structure
 
 ```
-docker-compose.yml          # All service definitions (production)
 config/
-  docker-compose.yml        # Synced copy deployed by CI
-  nginx/                    # Reverse proxy configs (sites-enabled, upstreams)
+  docker-compose.yml        # All production services; CI copies it to /opt/akatsuki and applies it
+  nginx/                    # Reverse proxy configs (sites-enabled, upstreams, TLS termination)
   mysql/                    # MySQL tuning (99-akatsuki.cnf)
   redis/                    # Redis config
   grafana/provisioning/     # Datasources and dashboards
   prometheus/               # Prometheus scrape config
-  loki/                     # Log aggregation config
+  loki/, promtail/          # Log storage and shipping config
+  thanos/                   # Object storage config template (bucket.yml.tpl)
   vault/                    # HashiCorp Vault config
-tf/                         # Terraform (Hetzner Cloud, Cloudflare)
+  apt/, cron/, systemd/     # apt periodic settings, host cron jobs, journald limits
+tf/                         # Terraform (Hetzner Cloud server and firewall, Cloudflare DNS)
 scripts/                    # Firewall, metrics backfill
-systemd/                    # Vault systemd unit
+systemd/                    # Unit that re-applies the firewall at boot
 setup.sh                    # Server bootstrap (full provisioning)
 ```
 
@@ -153,6 +154,8 @@ If you want domain-based routing locally (matching production), copy the nginx c
 ```bash
 cp config/nginx/nginx.conf /etc/nginx/nginx.conf
 cp config/nginx/sites-enabled/*.conf /etc/nginx/sites-enabled/
+# ssl-termination.conf needs the production origin certificate; drop it locally
+rm /etc/nginx/sites-enabled/ssl-termination.conf
 
 # Edit upstreams.conf to point at localhost ports
 # Add entries to /etc/hosts:
@@ -163,9 +166,32 @@ For simple local dev, you can skip nginx and hit services directly on their port
 
 ## Deployment
 
-Push to `main` triggers CI which SSHes to the server, pulls the latest configs, and reloads nginx. See `.github/workflows/deploy.yml`.
+Push to `main` triggers CI (`.github/workflows/deploy.yml`), which SSHes to the server, checks out `main` in `/opt/akatsuki/hetzner-infra`, and applies it:
 
-Services are deployed independently from their own repos — this repo only manages infrastructure configuration.
+- Copies host config (apt, journald, MySQL, cron, Vault, nginx) into place. `/etc/nginx/sites-enabled` is mirrored, so deleting a file from the repo removes that site. nginx is validated and reloaded.
+- Applies the firewall and enables `akatsuki-firewall.service`, which re-applies it at boot.
+- Restarts Redis if `redis.conf` changed. CI never restarts MySQL or Vault; restart those by hand (Vault then needs unsealing).
+- Runs `docker compose up -d`, which recreates containers whose definition changed and starts any that are stopped (cron services are profile-gated and stay off). Then restarts any container whose mounted config under `config/` changed after it started.
+
+Application images are built and deployed from each service's own repo; their deploys pull the image and recreate their own service.
+
+## Rebuilding the server
+
+1. **Terraform** (`tf/`) creates the server, its firewall, and the DNS records. It runs in CI (`.github/workflows/terraform.yml`): pull requests that touch `tf/` get a plan, and merges to `main` apply it, using the repository secrets `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `SSH_PUBLIC_KEY`, and `WASABI_ACCESS_KEY` / `WASABI_SECRET_KEY` (the state bucket). DNS records point at the server's address, so a new server updates them. The server has `prevent_destroy`, so CI can never delete or replace it.
+2. **Origin certificate**: install the Cloudflare origin certificate at `/etc/ssl/certs/akatsuki-origin.pem` and its key at `/etc/ssl/private/akatsuki-origin.key`.
+3. **Bootstrap**: clone this repo to `/opt/akatsuki/hetzner-infra`, create `.env` from `.env.example`, then run `set -a && source .env && set +a && ./setup.sh`.
+4. Follow the manual steps `setup.sh` prints at the end (unseal Vault, create `/opt/akatsuki/.env`, restore MySQL, start services).
+   Backups contain the `akatsuki` database but not MySQL's accounts, so recreate those by hand after restoring. Each service's password is in its Vault entry.
+
+Secrets are kept out of the repo, in these files on the host:
+
+| File | Contents | Created by |
+|------|----------|------------|
+| `/opt/akatsuki/hetzner-infra/.env` | `setup.sh` inputs (see `.env.example`) | hand |
+| `/opt/akatsuki/.env` | Variables `docker-compose.yml` interpolates: `VAULT_TOKEN`, `WASABI_*`, `GRAFANA_*` | hand |
+| `/etc/vault.d/vault.env` | Vault's S3 credentials | `setup.sh` |
+| `config/thanos/bucket.yml` | Thanos object storage config (gitignored) | `setup.sh`, from `bucket.yml.tpl` |
+| `/etc/ssl/private/akatsuki-origin.key` | Cloudflare origin certificate key | hand |
 
 ## License
 

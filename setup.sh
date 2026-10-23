@@ -4,6 +4,12 @@ set -euo pipefail
 # Hetzner Cloud CPX42 server bootstrap script
 # Installs and configures all services for Akatsuki production
 
+# CI deploys from this checkout, and the firewall unit runs scripts/apply-firewall.sh from it
+if [ "$PWD" != /opt/akatsuki/hetzner-infra ]; then
+    echo "ERROR: run from a clone of this repo at /opt/akatsuki/hetzner-infra"
+    exit 1
+fi
+
 echo "=== Creating swap file (4GB) ==="
 fallocate -l 4G /swapfile
 chmod 600 /swapfile
@@ -24,6 +30,12 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     python3-pip python3-venv \
     curl jq
 pip3 install --break-system-packages awscli
+
+echo "=== Configuring firewall ==="
+bash scripts/apply-firewall.sh
+install -m 0644 systemd/akatsuki-firewall.service /etc/systemd/system/akatsuki-firewall.service
+systemctl daemon-reload
+systemctl enable akatsuki-firewall.service
 
 echo "=== Configuring journald ==="
 mkdir -p /etc/systemd/journald.conf.d
@@ -51,8 +63,11 @@ id vault 2>/dev/null || useradd --system --home /opt/vault --shell /bin/false va
 mkdir -p /opt/vault/data /opt/vault/tls /vault /etc/vault.d
 touch /vault/vault-audit.log
 # Vault's package installs a default config at /etc/vault.d/vault.hcl;
-# overwrite it with ours so the default systemd unit picks it up.
-envsubst < config/vault/config.hcl > /etc/vault.d/vault.hcl
+# overwrite it with ours so the default systemd unit picks it up. The unit
+# also loads /etc/vault.d/vault.env, which holds the S3 credentials.
+cp config/vault/config.hcl /etc/vault.d/vault.hcl
+install -m 0600 /dev/null /etc/vault.d/vault.env
+printf 'AWS_ACCESS_KEY_ID=%s\nAWS_SECRET_ACCESS_KEY=%s\n' "$VAULT_S3_ACCESS_KEY" "$VAULT_S3_SECRET_KEY" > /etc/vault.d/vault.env
 chown -R vault:vault /opt/vault /vault /etc/vault.d
 systemctl enable vault
 
@@ -91,8 +106,25 @@ cp config/nginx/robots.txt /etc/nginx/robots.txt
 rm -rf /etc/nginx/sites-enabled/*
 cp config/nginx/sites-enabled/*.conf /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
+# ssl-termination.conf needs the Cloudflare origin certificate, which is kept out of the repo
+for f in /etc/ssl/certs/akatsuki-origin.pem /etc/ssl/private/akatsuki-origin.key; do
+    if [ ! -s "$f" ]; then
+        echo "ERROR: $f is missing; install the Cloudflare origin certificate and key first"
+        exit 1
+    fi
+done
 nginx -t
 systemctl restart nginx
+
+echo "=== Configuring Docker Compose ==="
+if [ -z "${WASABI_ACCESS_KEY:-}" ] || [ -z "${WASABI_SECRET_KEY:-}" ]; then
+    echo "ERROR: WASABI_ACCESS_KEY and WASABI_SECRET_KEY must be set"
+    exit 1
+fi
+envsubst < config/thanos/bucket.yml.tpl > config/thanos/bucket.yml
+# docker-compose.yml mounts files from ./config
+ln -sfn hetzner-infra/config /opt/akatsuki/config
+cp config/docker-compose.yml /opt/akatsuki/docker-compose.yml
 
 echo "=== Configuring cron jobs ==="
 cp config/cron/akatsuki /etc/cron.d/akatsuki
@@ -106,7 +138,6 @@ echo "=== Setup complete ==="
 echo ""
 echo "Remaining manual steps:"
 echo "  1. Unseal Vault:  export VAULT_ADDR=http://127.0.0.1:8200 && vault operator unseal <key>"
-echo "  2. Create .env:   echo 'VAULT_TOKEN=<token>' > /opt/akatsuki/.env"
+echo "  2. Create /opt/akatsuki/.env with the variables docker-compose.yml uses (see README)"
 echo "  3. Restore MySQL:  see restore-db.sh"
-echo "  4. Create MySQL users: see create-mysql-users.sh"
-echo "  5. Start services: cd /opt/akatsuki && docker compose up -d"
+echo "  4. Start services: cd /opt/akatsuki && docker compose up -d"

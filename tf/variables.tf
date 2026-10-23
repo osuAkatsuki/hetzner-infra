@@ -40,9 +40,3 @@ variable "cloudflare_ipv4_ranges" {
     "131.0.72.0/22",
   ]
 }
-
-# Tailscale CGNAT range for SSH access
-variable "tailscale_ipv4_range" {
-  type    = string
-  default = "100.64.0.0/10"
-}

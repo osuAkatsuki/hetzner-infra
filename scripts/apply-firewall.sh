@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Akatsuki Hetzner Firewall Rules
 #
-# Policy: DROP all inbound by default, allow only:
+# Policy: DROP all inbound by default (IPv4 and IPv6), allow only:
 #   - SSH (22) from anywhere
-#   - HTTP (80) and HTTPS (443) from Cloudflare IPs only
+#   - HTTP (80) and HTTPS (443) from Cloudflare IPv4 ranges only
 #   - Everything on loopback (services communicate via 127.0.0.1)
 #   - Established/related connections (return traffic)
 #
@@ -68,7 +68,18 @@ done
 iptables -A INPUT -m limit --limit 5/min -j LOG \
     --log-prefix "iptables-dropped: " --log-level 4
 
-# Persist rules across reboots
-iptables-save > /etc/iptables/rules.v4
+# IPv6: same default-drop policy. No HTTP/HTTPS rules, because the Hetzner Cloud firewall only
+# admits Cloudflare's IPv4 ranges on 80/443. ICMPv6 is required for neighbor discovery.
+ip6tables -F INPUT
+ip6tables -F OUTPUT
+ip6tables -P INPUT DROP
+ip6tables -P OUTPUT ACCEPT
+ip6tables -A INPUT -i lo -j ACCEPT
+ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+ip6tables -A INPUT -p tcp --dport 22 -j ACCEPT
+ip6tables -A INPUT -p ipv6-icmp -j ACCEPT
+ip6tables -A INPUT -m limit --limit 5/min -j LOG \
+    --log-prefix "ip6tables-dropped: " --log-level 4
 
-echo "Firewall applied and persisted."
+# Rules are not saved; systemd/akatsuki-firewall.service re-runs this script at boot.
+echo "Firewall applied."
