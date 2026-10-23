@@ -121,6 +121,8 @@ loki.process "mysql" {
 
 prometheus.exporter.mysql "default" {
 	data_source_name = "alloy:" + sys.env("MYSQL_EXPORTER_PASSWORD") + "@(127.0.0.1:3306)/"
+	// Feeds the MySQL dashboard's "Process States" panels
+	enable_collectors = ["info_schema.processlist"]
 }
 
 prometheus.exporter.redis "default" {

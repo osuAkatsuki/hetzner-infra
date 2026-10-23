@@ -17,8 +17,8 @@
       "datasource": { "type": "redis-datasource", "uid": "redis" },
       "targets": [
         {
-          "command": "scard",
-          "keyName": "peppy:online_users",
+          "command": "hlen",
+          "keyName": "akatsuki:bancho:sessions",
           "refId": "A"
         }
       ],
