@@ -39,7 +39,13 @@ for f in "${EXPORT_DIR}"/*.sql.gz; do
     table_name=$(basename "$f" .sql.gz | sed 's/^akatsuki\.//')
     count=$((count + 1))
     echo "[${count}/${total}] Restoring ${table_name}..."
-    gunzip -c "$f" | mysql akatsuki
+    if [ "$table_name" = "mysql.accounts" ]; then
+        # Accounts and grants (sorted after the tables, which table-level grants need). A grant on
+        # a since-dropped table fails, but shouldn't stop the remaining accounts.
+        gunzip -c "$f" | mysql --force
+    else
+        gunzip -c "$f" | mysql akatsuki
+    fi
 done
 
 echo "=== Restore complete ==="
