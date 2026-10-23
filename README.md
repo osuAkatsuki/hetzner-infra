@@ -14,7 +14,8 @@ config/
   redis/                    # Redis config
   grafana/provisioning/     # Datasources and dashboards
   prometheus/               # Prometheus scrape config
-  loki/, promtail/          # Log storage and shipping config
+  loki/                     # Log storage config
+  alloy/                    # Collector: container, journal and host-file logs, MySQL/Redis metrics
   thanos/                   # Object storage config template (bucket.yml.tpl)
   vault/                    # HashiCorp Vault config
   apt/, cron/, systemd/     # apt periodic settings, host cron jobs, journald limits
@@ -187,7 +188,7 @@ Secrets are kept out of the repo, in these files on the host:
 | File | Contents | Created by |
 |------|----------|------------|
 | `/opt/akatsuki/hetzner-infra/.env` | `setup.sh` inputs (see `.env.example`) | hand |
-| `/opt/akatsuki/.env` | Variables `docker-compose.yml` interpolates: `VAULT_TOKEN`, `WASABI_*`, `GRAFANA_*` | hand |
+| `/opt/akatsuki/.env` | Variables `docker-compose.yml` interpolates: `VAULT_TOKEN`, `WASABI_*`, `GRAFANA_*`, `MYSQL_EXPORTER_PASSWORD` | hand |
 | `/etc/vault.d/vault.env` | Vault's S3 credentials | `setup.sh` |
 | `config/thanos/bucket.yml` | Thanos object storage config (gitignored) | `setup.sh`, from `bucket.yml.tpl` |
 | `/etc/ssl/private/akatsuki-origin.key` | Cloudflare origin certificate key | hand |

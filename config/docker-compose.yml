@@ -364,6 +364,7 @@ services:
       - "--storage.tsdb.min-block-duration=2h"
       - "--storage.tsdb.max-block-duration=2h"
       - "--web.listen-address=:9090"
+      - "--web.enable-remote-write-receiver"
 
   thanos-sidecar:
     image: thanosio/thanos:v0.41.0
@@ -453,18 +454,26 @@ services:
       - "-config.file=/etc/loki/config.yml"
       - "-config.expand-env=true"
 
-  promtail:
-    image: grafana/promtail:latest
+  # Collects container, journal and host-file logs into Loki, and MySQL/Redis metrics into Prometheus
+  alloy:
+    image: grafana/alloy:v1.21.2
     restart: unless-stopped
     network_mode: host
     logging: *json-log-rotation
+    environment:
+      MYSQL_EXPORTER_PASSWORD: "${MYSQL_EXPORTER_PASSWORD}"
     volumes:
-      - ./config/promtail/config.yml:/etc/promtail/config.yml:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./config/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - promtail-positions:/tmp/promtail
+      - /var/log:/var/log:ro
+      - /run/log/journal:/run/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - alloy-data:/var/lib/alloy/data
     command:
-      - "-config.file=/etc/promtail/config.yml"
+      - "run"
+      - "--server.http.listen-addr=127.0.0.1:12345"
+      - "--storage.path=/var/lib/alloy/data"
+      - "/etc/alloy/config.alloy"
 
   # === Tools ===
 
@@ -513,4 +522,4 @@ volumes:
   thanos-compactor-data:
   thanos-store-data:
   loki-data:
-  promtail-positions:
+  alloy-data:
