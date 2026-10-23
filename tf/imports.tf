@@ -2,19 +2,6 @@
 # is in state, its import block is a no-op.
 
 locals {
-  imported_server_record_ids = {
-    "a-staging"        = "94ea895cb094fcf6bef4087bef3f0f64"
-    "beatmaps-staging" = "fb0485d62add0d6cf479e166e2b7b05c"
-    "c-staging"        = "d178df5fc032b3cdb2044e1c12c7f0b4"
-    "c4-staging"       = "e386272ac547ebc4de5d32bd3275f265"
-    "ce-staging"       = "a30a87846ffa7bc8ae04fa34fde3a79e"
-    "grafana-staging"  = "9bc9148a27d6116ac005a2a55c73d716"
-    "old-staging"      = "bb4c3f8001f563c6c3091ae9d238ca2f"
-    "osu-staging"      = "ee2c56f990530584f8570fab822fc78e"
-    "staging"          = "8ab71168ceee962ec0149cbab7fba5ae"
-    "users-staging"    = "ce7f30dcbe3540cbcf65c236bc331f3e"
-  }
-
   imported_cname_record_ids = {
     "a"                = "179f0b68cd0e7f97a07175291846cc1f"
     "afterburn"        = "8b51f41e0697927298caa5b21d713dc3"
@@ -23,14 +10,11 @@ locals {
     "b"                = "6ee19f44bf87065363caee9d3c05a7a5"
     "beatmaps"         = "fad0bd13cea5e0fb81469c735ecb612a"
     "c"                = "716ef8ba0d0d3bf5ac99d7b86afa7477"
-    "difficulty"       = "60590adccff06bef9cc8cd88cfcb7595"
     "grafana"          = "8341cc2c57d6e5a97349cede596a1863"
-    "next"             = "ffcec3c231e30b15f115d9bb36f650c4"
     "old"              = "49009678a2c31101a4b0484428c5ee9e"
     "osu"              = "e5f9fa810f24478ec6212e2e5bd40542"
     "payments"         = "e0d1427279c9900c22b897d7b33efd9c"
     "performance"      = "f8963f0589aab4febc666e249e3b18a3"
-    "relax"            = "ac35937a3b1dd16002c34ff979c1c69c"
     "rework"           = "e3e21a2cfcf8d367fb84fffd12881f8d"
     "reworks"          = "660b7bf2540aeb1d28590e866876ca44"
     "s"                = "607a671bcc399aee897f192ffbf904e2"
@@ -57,12 +41,6 @@ locals {
 import {
   to = cloudflare_record.apex
   id = "${var.cloudflare_zone_id}/c777c536e462f6e23c88838db09ecc15"
-}
-
-import {
-  for_each = local.imported_server_record_ids
-  to       = cloudflare_record.server[each.key]
-  id       = "${var.cloudflare_zone_id}/${each.value}"
 }
 
 import {

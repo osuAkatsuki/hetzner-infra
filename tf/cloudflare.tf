@@ -1,21 +1,7 @@
+# Record names are relative to their zone, as the Cloudflare provider stores them
+
 locals {
   cmyui_xyz_zone_id = "3d498eac702151a0b0dbd5b4509f97be"
-
-  # Record names are relative to their zone, as the Cloudflare provider stores them
-
-  # akatsuki.gg subdomains with their own A record pointing at the server
-  server_subdomains = toset([
-    "a-staging",
-    "beatmaps-staging",
-    "c-staging",
-    "c4-staging",
-    "ce-staging",
-    "grafana-staging",
-    "old-staging",
-    "osu-staging",
-    "staging",
-    "users-staging",
-  ])
 
   # akatsuki.gg subdomains that CNAME to the apex
   cname_subdomains = toset([
@@ -26,14 +12,11 @@ locals {
     "b",
     "beatmaps",
     "c",
-    "difficulty",
     "grafana",
-    "next",
     "old",
     "osu",
     "payments",
     "performance",
-    "relax",
     "rework",
     "reworks",
     "s",
@@ -64,17 +47,6 @@ locals {
 resource "cloudflare_record" "apex" {
   zone_id = var.cloudflare_zone_id
   name    = "akatsuki.gg"
-  type    = "A"
-  content = hcloud_server.production.ipv4_address
-  proxied = true
-  ttl     = 1
-}
-
-resource "cloudflare_record" "server" {
-  for_each = local.server_subdomains
-
-  zone_id = var.cloudflare_zone_id
-  name    = each.value
   type    = "A"
   content = hcloud_server.production.ipv4_address
   proxied = true
