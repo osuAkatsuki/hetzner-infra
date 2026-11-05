@@ -10,16 +10,17 @@ fetches each replay from replays/<score id>.osr and compresses it with osu-orz,
 with the encoder's round trip check on. It then decompresses the .orz: a replay
 passes when that gives back the original bytes, LZMA stream included.
 
-Replays saved by ruri end with the line break before the form's closing
-boundary, which its multipart parser left in (rumoi/ruri, ruri/Aria.h). When a
-replay ends with \r\n and its round trip gives back exactly the bytes before
-it, those bytes are osu!'s whole LZMA stream: the replay is converted without
-the \r\n, and results.tsv says so.
+Replays saved by ruri carry part of the form after them: its multipart parser
+cut a fixed 49 bytes off the end of the request (rumoi/ruri, ruri/Aria.h), so
+the replay kept as many bytes of "\r\n" + closing boundary as followed the
+closing boundary in the request. When the round trip gives back exactly the
+start of the stored bytes, the start is osu!'s whole LZMA stream; when the rest
+is that tail, the replay is converted without it, and results.tsv says so.
 
 Writes to --out-dir:
 - results.tsv: a line per replay (status, sizes, the mode the .orz stores,
-  whether it stores the replay data as it is, whether a trailing \r\n was
-  dropped, timings)
+  whether it stores the replay data as it is, how many bytes of ruri's tail
+  were dropped, timings)
 - failures.jsonl: details of each replay that did not pass
 - failed/<score id>.osr: the original bytes of each replay that did not pass
 
@@ -55,10 +56,13 @@ RESULT_FIELDS = (
     "bytes_out",
     "stored_mode",
     "as_is",
-    "crlf_stripped",
+    "ruri_tail",
     "compress_ms",
     "decompress_ms",
 )
+
+# what ruri's multipart parser left after a replay starts with
+RURI_TAIL = b"\r\n-------------------------------28947758029299--"
 
 # stored_mode: the .orz's mode, which is 7 where the encoder coded the autopilot path
 ORZ_AUTOPILOT = 7
@@ -107,6 +111,20 @@ def first_difference(a, b):
     )
 
 
+def ruri_tail(data, back):
+    """How many bytes of ruri's tail follow the replay in data, given that back,
+    what its round trip gave, is osu!'s whole LZMA stream. 0 when there are none.
+    """
+    if len(back) < len(data) and data.startswith(back):
+        extra = data[len(back) :]
+
+        # cut short, or followed by what came after the closing boundary
+        if RURI_TAIL.startswith(extra) or extra.startswith(RURI_TAIL):
+            return len(extra)
+
+    return 0
+
+
 def round_trip(data, akatsuki_mode, result):
     """Compress data and decompress the .orz, noting sizes and timings in result.
 
@@ -145,7 +163,7 @@ def round_trip(data, akatsuki_mode, result):
 
 
 def convert(s3, score_id, akatsuki_mode, upload):
-    result = {"score_id": score_id, "mode": akatsuki_mode, "crlf_stripped": 0}
+    result = {"score_id": score_id, "mode": akatsuki_mode, "ruri_tail": 0}
 
     try:
         response = s3.get_object(Bucket=S3_BUCKET, Key=f"replays/{score_id}.osr")
@@ -161,10 +179,9 @@ def convert(s3, score_id, akatsuki_mode, upload):
 
     error, orz, back = round_trip(data, akatsuki_mode, result)
 
-    # ruri's \r\n: osu!'s encoder gives back exactly the bytes before it
-    if error is None and data.endswith(b"\r\n") and back == data[:-2]:
-        data = data[:-2]
-        result["crlf_stripped"] = 1
+    if error is None and (tail := ruri_tail(data, back)):
+        data = data[:-tail]
+        result["ruri_tail"] = tail
         error, orz, back = round_trip(data, akatsuki_mode, result)
 
     if error is not None:
@@ -212,7 +229,7 @@ def summarize(results_path):
         + ", ".join(f"{n} {s}" for s, n in statuses.most_common())
     )
     print(
-        "mode  replays      ok  as is  autopilot   crlf  bytes in -> out (ok)  compress ms  decompress ms"
+        "mode  replays      ok  as is  autopilot   ruri  bytes in -> out (ok)  compress ms  decompress ms"
     )
 
     for mode in sorted({row["mode"] for row in rows}, key=int):
@@ -228,14 +245,14 @@ def summarize(results_path):
         bytes_out = sum(int(row["bytes_out"]) for row in ok)
         as_is = sum(row["as_is"] == "1" for row in group)
         autopilot = sum(row["stored_mode"] == str(ORZ_AUTOPILOT) for row in group)
-        crlf = sum(row["crlf_stripped"] == "1" for row in group)
+        ruri = sum(row["ruri_tail"] != "0" for row in group)
         timed = [row for row in group if row["decompress_ms"]]
 
         def mean_ms(field):
             return sum(float(row[field]) for row in timed) / max(len(timed), 1)
 
         print(
-            f"{mode:>4}  {len(group):>7}  {len(ok):>6}  {as_is:>5}  {autopilot:>9}  {crlf:>5}"
+            f"{mode:>4}  {len(group):>7}  {len(ok):>6}  {as_is:>5}  {autopilot:>9}  {ruri:>5}"
             f"  {100 * bytes_out / max(bytes_in, 1):>19.2f}%"
             f"  {mean_ms('compress_ms'):>11.0f}  {mean_ms('decompress_ms'):>13.0f}"
         )
