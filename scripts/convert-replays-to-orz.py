@@ -10,9 +10,16 @@ fetches each replay from replays/<score id>.osr and compresses it with osu-orz,
 with the encoder's round trip check on. It then decompresses the .orz: a replay
 passes when that gives back the original bytes, LZMA stream included.
 
+Replays saved by ruri end with the line break before the form's closing
+boundary, which its multipart parser left in (rumoi/ruri, ruri/Aria.h). When a
+replay ends with \r\n and its round trip gives back exactly the bytes before
+it, those bytes are osu!'s whole LZMA stream: the replay is converted without
+the \r\n, and results.tsv says so.
+
 Writes to --out-dir:
 - results.tsv: a line per replay (status, sizes, the mode the .orz stores,
-  whether it stores the replay data as it is, timings)
+  whether it stores the replay data as it is, whether a trailing \r\n was
+  dropped, timings)
 - failures.jsonl: details of each replay that did not pass
 - failed/<score id>.osr: the original bytes of each replay that did not pass
 
@@ -48,6 +55,7 @@ RESULT_FIELDS = (
     "bytes_out",
     "stored_mode",
     "as_is",
+    "crlf_stripped",
     "compress_ms",
     "decompress_ms",
 )
@@ -99,21 +107,12 @@ def first_difference(a, b):
     )
 
 
-def convert(s3, score_id, akatsuki_mode, upload):
-    result = {"score_id": score_id, "mode": akatsuki_mode}
+def round_trip(data, akatsuki_mode, result):
+    """Compress data and decompress the .orz, noting sizes and timings in result.
 
-    try:
-        response = s3.get_object(Bucket=S3_BUCKET, Key=f"replays/{score_id}.osr")
-        data = response["Body"].read()
-    except ClientError as error:
-        # without permission to list the bucket, a missing replay reads as access denied
-        if error.response["Error"]["Code"] in ("NoSuchKey", "AccessDenied"):
-            return {**result, "status": "missing"}, None
-
-        raise
-
-    result["bytes_in"] = len(data)
-
+    Returns the error status (None when there is none), the .orz and what it
+    decompresses to.
+    """
     start = time.perf_counter()
 
     try:
@@ -121,7 +120,8 @@ def convert(s3, score_id, akatsuki_mode, upload):
             data, mode=orz_mode(akatsuki_mode), check_round_trip=True
         )
     except osu_orz.OrzError as error:
-        return {**result, "status": "compress_error", "error": str(error)}, data
+        result["error"] = str(error)
+        return "compress_error", None, None
 
     compressed = time.perf_counter()
 
@@ -136,9 +136,39 @@ def convert(s3, score_id, akatsuki_mode, upload):
     try:
         back = osu_orz.decompress(orz)
     except osu_orz.OrzError as error:
-        return {**result, "status": "decompress_error", "error": str(error)}, data
+        result["error"] = str(error)
+        return "decompress_error", orz, None
 
     result["decompress_ms"] = round(1e3 * (time.perf_counter() - compressed), 1)
+
+    return None, orz, back
+
+
+def convert(s3, score_id, akatsuki_mode, upload):
+    result = {"score_id": score_id, "mode": akatsuki_mode, "crlf_stripped": 0}
+
+    try:
+        response = s3.get_object(Bucket=S3_BUCKET, Key=f"replays/{score_id}.osr")
+        original = data = response["Body"].read()
+    except ClientError as error:
+        # without permission to list the bucket, a missing replay reads as access denied
+        if error.response["Error"]["Code"] in ("NoSuchKey", "AccessDenied"):
+            return {**result, "status": "missing"}, None
+
+        raise
+
+    result["bytes_in"] = len(data)
+
+    error, orz, back = round_trip(data, akatsuki_mode, result)
+
+    # ruri's \r\n: osu!'s encoder gives back exactly the bytes before it
+    if error is None and data.endswith(b"\r\n") and back == data[:-2]:
+        data = data[:-2]
+        result["crlf_stripped"] = 1
+        error, orz, back = round_trip(data, akatsuki_mode, result)
+
+    if error is not None:
+        return {**result, "status": error}, original
 
     if back == data:
         if upload:
@@ -160,7 +190,7 @@ def convert(s3, score_id, akatsuki_mode, upload):
         "lzma_header": data[:13].hex(),
         "lzma_header_back": back[:13].hex(),
         "text_decodes": text is not None,
-    }, data
+    }, original
 
 
 def read_scores(path):
@@ -182,7 +212,7 @@ def summarize(results_path):
         + ", ".join(f"{n} {s}" for s, n in statuses.most_common())
     )
     print(
-        "mode  replays      ok  as is  autopilot  bytes in -> out (ok)  compress ms  decompress ms"
+        "mode  replays      ok  as is  autopilot   crlf  bytes in -> out (ok)  compress ms  decompress ms"
     )
 
     for mode in sorted({row["mode"] for row in rows}, key=int):
@@ -198,13 +228,14 @@ def summarize(results_path):
         bytes_out = sum(int(row["bytes_out"]) for row in ok)
         as_is = sum(row["as_is"] == "1" for row in group)
         autopilot = sum(row["stored_mode"] == str(ORZ_AUTOPILOT) for row in group)
+        crlf = sum(row["crlf_stripped"] == "1" for row in group)
         timed = [row for row in group if row["decompress_ms"]]
 
         def mean_ms(field):
             return sum(float(row[field]) for row in timed) / max(len(timed), 1)
 
         print(
-            f"{mode:>4}  {len(group):>7}  {len(ok):>6}  {as_is:>5}  {autopilot:>9}"
+            f"{mode:>4}  {len(group):>7}  {len(ok):>6}  {as_is:>5}  {autopilot:>9}  {crlf:>5}"
             f"  {100 * bytes_out / max(bytes_in, 1):>19.2f}%"
             f"  {mean_ms('compress_ms'):>11.0f}  {mean_ms('decompress_ms'):>13.0f}"
         )
