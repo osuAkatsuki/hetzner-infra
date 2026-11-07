@@ -3,12 +3,20 @@
 # requires-python = ">=3.12"
 # dependencies = ["boto3", "osu-orz==0.1.0"]
 # ///
-"""Convert replays in S3 to ORZ, checking that each one comes back byte for byte.
+"""Convert replays in S3 to ORZ, checking each one before it is written.
 
-Reads a TSV of score ids and Akatsuki modes (0-3 vanilla, 4-6 relax, 8 autopilot),
-fetches each replay from replays/<score id>.osr and compresses it with osu-orz,
-with the encoder's round trip check on. It then decompresses the .orz: a replay
-passes when that gives back the original bytes, LZMA stream included.
+Reads a TSV of score ids and Akatsuki modes (0-3 vanilla, 4-6 relax, 8 autopilot)
+and fetches each replay from replays/<score id>.osr. Every replay is checked:
+
+- the bytes read have the MD5 S3 has for them (a single-part upload's ETag);
+- osu-orz compresses it with its round trip check on, so the .orz decodes to
+  the same replay text, or stores the replay data as it is when it would not.
+
+The .orz rebuilds the LZMA stream around the text with osu!'s LZMA encoder, which
+gives back the stored bytes when osu!'s encoder wrote them. A byte check
+decompresses the .orz and compares it with the stored bytes, LZMA stream
+included. It runs for a random share of replays (--byte-check-rate), and for
+every replay whose LZMA header is not osu!'s or whose end may be ruri's tail.
 
 Replays saved by ruri carry part of the form after them: its multipart parser
 cut a fixed 49 bytes off the end of the request (rumoi/ruri, ruri/Aria.h), so
@@ -20,22 +28,28 @@ is that tail, the replay is converted without it, and results.tsv says so.
 Writes to --out-dir:
 - results.tsv: a line per replay (status, sizes, the mode the .orz stores,
   whether it stores the replay data as it is, how many bytes of ruri's tail
-  were dropped, timings)
+  were dropped, timings, which check ran, the stored replay's ETag, the .orz's
+  MD5 and the osu-orz version)
 - failures.jsonl: details of each replay that did not pass
 - failed/<score id>.osr: the original bytes of each replay that did not pass
 
 A run resumes: score ids already in results.tsv are skipped. With --upload,
-passing replays are written to replays-orz/<score id>.orz.
+passing replays are written to replays-orz/<score id>.orz, with their MD5 for S3
+to check.
 
     AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... \\
         ./convert-replays-to-orz.py scores.tsv --out-dir orz-run
 """
 
 import argparse
+import base64
 import collections
 import concurrent.futures
+import hashlib
+import importlib.metadata
 import json
 import lzma
+import random
 import time
 from pathlib import Path
 
@@ -47,6 +61,7 @@ from botocore.exceptions import ClientError
 S3_BUCKET = "akatsuki.pw"
 S3_ENDPOINT = "https://s3.ca-central-1.wasabisys.com"
 ORZ_PREFIX = "replays-orz"
+OSU_ORZ_VERSION = importlib.metadata.version("osu-orz")
 
 RESULT_FIELDS = (
     "score_id",
@@ -59,7 +74,14 @@ RESULT_FIELDS = (
     "ruri_tail",
     "compress_ms",
     "decompress_ms",
+    "check",
+    "etag",
+    "orz_md5",
+    "osu_orz",
 )
+
+# how osu!'s LZMA encoder starts replay data: lc 3, lp 0, pb 2, a 2 MiB dictionary
+OSU_LZMA_PROPERTIES = bytes([0x5D]) + (1 << 21).to_bytes(4, "little")
 
 # what ruri's multipart parser left after a replay starts with
 RURI_TAIL = b"\r\n-------------------------------28947758029299--"
@@ -125,11 +147,22 @@ def ruri_tail(data, back):
     return 0
 
 
-def round_trip(data, akatsuki_mode, result):
-    """Compress data and decompress the .orz, noting sizes and timings in result.
+def needs_byte_check(data, rate):
+    return (
+        random.random() < rate
+        or not data.startswith(OSU_LZMA_PROPERTIES)
+        # osu! always writes the text size
+        or data[5:13] == b"\xff" * 8
+        # ruri's tail, or what may be: "\r" or "\r\n" can also end osu!'s stream
+        or RURI_TAIL in data
+        or any(data.endswith(RURI_TAIL[:n]) for n in range(1, len(RURI_TAIL)))
+    )
 
-    Returns the error status (None when there is none), the .orz and what it
-    decompresses to.
+
+def compress(data, akatsuki_mode, result):
+    """Compress data with the round trip check, noting the .orz in result.
+
+    Returns the .orz, or None when osu-orz raised an error.
     """
     start = time.perf_counter()
 
@@ -139,17 +172,29 @@ def round_trip(data, akatsuki_mode, result):
         )
     except osu_orz.OrzError as error:
         result["error"] = str(error)
-        return "compress_error", None, None
-
-    compressed = time.perf_counter()
+        return None
 
     info = encode_info(orz)
     result.update(
         bytes_out=len(orz),
         stored_mode=info & 15,
         as_is=int(bool(info & ORZ_STORED_AS_IS)),
-        compress_ms=round(1e3 * (compressed - start), 1),
+        compress_ms=round(1e3 * (time.perf_counter() - start), 1),
     )
+
+    return orz
+
+
+def round_trip(data, akatsuki_mode, result):
+    """Compress data and decompress the .orz, noting sizes and timings in result.
+
+    Returns the error status (None when there is none), the .orz and what it
+    decompresses to.
+    """
+    if (orz := compress(data, akatsuki_mode, result)) is None:
+        return "compress_error", None, None
+
+    start = time.perf_counter()
 
     try:
         back = osu_orz.decompress(orz)
@@ -157,13 +202,18 @@ def round_trip(data, akatsuki_mode, result):
         result["error"] = str(error)
         return "decompress_error", orz, None
 
-    result["decompress_ms"] = round(1e3 * (time.perf_counter() - compressed), 1)
+    result["decompress_ms"] = round(1e3 * (time.perf_counter() - start), 1)
 
     return None, orz, back
 
 
-def convert(s3, score_id, akatsuki_mode, upload):
-    result = {"score_id": score_id, "mode": akatsuki_mode, "ruri_tail": 0}
+def convert(s3, score_id, akatsuki_mode, upload, byte_check_rate):
+    result = {
+        "score_id": score_id,
+        "mode": akatsuki_mode,
+        "ruri_tail": 0,
+        "osu_orz": OSU_ORZ_VERSION,
+    }
 
     try:
         response = s3.get_object(Bucket=S3_BUCKET, Key=f"replays/{score_id}.osr")
@@ -175,8 +225,22 @@ def convert(s3, score_id, akatsuki_mode, upload):
 
         raise
 
-    result["bytes_in"] = len(data)
+    etag = response["ETag"].strip('"')
+    result.update(bytes_in=len(data), etag=etag)
 
+    # a multipart upload's ETag is not the MD5 of its bytes
+    if "-" not in etag and hashlib.md5(data).hexdigest() != etag:
+        return {**result, "status": "bad_read"}, original
+
+    if not needs_byte_check(data, byte_check_rate):
+        result["check"] = "text"
+
+        if (orz := compress(data, akatsuki_mode, result)) is None:
+            return {**result, "status": "compress_error"}, original
+
+        return finish(s3, result, orz, upload), None
+
+    result["check"] = "bytes"
     error, orz, back = round_trip(data, akatsuki_mode, result)
 
     if error is None and (tail := ruri_tail(data, back)):
@@ -188,12 +252,7 @@ def convert(s3, score_id, akatsuki_mode, upload):
         return {**result, "status": error}, original
 
     if back == data:
-        if upload:
-            s3.put_object(
-                Bucket=S3_BUCKET, Key=f"{ORZ_PREFIX}/{score_id}.orz", Body=orz
-            )
-
-        return {**result, "status": "ok"}, None
+        return finish(s3, result, orz, upload), None
 
     # the frames can come back with LZMA bytes osu!'s encoder would not write
     text = replay_text(data)
@@ -208,6 +267,20 @@ def convert(s3, score_id, akatsuki_mode, upload):
         "lzma_header_back": back[:13].hex(),
         "text_decodes": text is not None,
     }, original
+
+
+def finish(s3, result, orz, upload):
+    md5 = hashlib.md5(orz)
+
+    if upload:
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=f"{ORZ_PREFIX}/{result['score_id']}.orz",
+            Body=orz,
+            ContentMD5=base64.b64encode(md5.digest()).decode(),
+        )
+
+    return {**result, "status": "ok", "orz_md5": md5.hexdigest()}
 
 
 def read_scores(path):
@@ -227,6 +300,7 @@ def summarize(results_path):
     print(
         f"{len(rows)} replays: "
         + ", ".join(f"{n} {s}" for s, n in statuses.most_common())
+        + f"; {sum(row.get('check') == 'bytes' for row in rows)} byte checked"
     )
     print(
         "mode  replays      ok  as is  autopilot   ruri  bytes in -> out (ok)  compress ms  decompress ms"
@@ -246,10 +320,10 @@ def summarize(results_path):
         as_is = sum(row["as_is"] == "1" for row in group)
         autopilot = sum(row["stored_mode"] == str(ORZ_AUTOPILOT) for row in group)
         ruri = sum(row["ruri_tail"] != "0" for row in group)
-        timed = [row for row in group if row["decompress_ms"]]
 
         def mean_ms(field):
-            return sum(float(row[field]) for row in timed) / max(len(timed), 1)
+            timed = [float(row[field]) for row in group if row[field]]
+            return sum(timed) / max(len(timed), 1)
 
         print(
             f"{mode:>4}  {len(group):>7}  {len(ok):>6}  {as_is:>5}  {autopilot:>9}  {ruri:>5}"
@@ -276,6 +350,12 @@ def main():
     parser.add_argument(
         "--upload", action="store_true", help=f"write passing replays to {ORZ_PREFIX}/"
     )
+    parser.add_argument(
+        "--byte-check-rate",
+        type=float,
+        default=0.02,
+        help="share of replays to also decompress and compare byte for byte",
+    )
     args = parser.parse_args()
 
     (args.out_dir / "failed").mkdir(parents=True, exist_ok=True)
@@ -283,6 +363,12 @@ def main():
 
     if not results_path.exists():
         results_path.write_text("\t".join(RESULT_FIELDS) + "\n")
+    else:
+        with open(results_path) as f:
+            header = f.readline().rstrip("\n").split("\t")
+
+        if header != list(RESULT_FIELDS):
+            parser.error(f"{results_path} has other columns; use a new --out-dir")
 
     done = {int(row["score_id"]) for row in tsv_rows(results_path)}
 
@@ -308,7 +394,9 @@ def main():
 
         def submit_next():
             if (score := next(scores, None)) is not None:
-                running.add(pool.submit(convert, s3, *score, args.upload))
+                running.add(
+                    pool.submit(convert, s3, *score, args.upload, args.byte_check_rate)
+                )
 
         for _ in range(2 * args.workers):
             submit_next()
