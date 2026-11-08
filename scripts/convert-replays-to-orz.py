@@ -1,12 +1,15 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["boto3", "osu-orz==0.1.0"]
+# dependencies = ["boto3", "osu-orz==0.2.0"]
 # ///
 """Convert replays in S3 to ORZ, checking each one before it is written.
 
-Reads a TSV of score ids and Akatsuki modes (0-3 vanilla, 4-6 relax, 8 autopilot)
-and fetches each replay from replays/<score id>.osr. Every replay is checked:
+Reads a TSV of score ids, Akatsuki modes (0-3 vanilla, 4-6 relax, 8 autopilot)
+and user ids, sorted by user id, and fetches each replay from
+replays/<score id>.osr. A user's replays are compressed in the list's order,
+each with the devices of the user's latest two replays as hints, so the encoder
+can skip its device search. Every replay is checked:
 
 - the bytes read have the MD5 S3 has for them (a single-part upload's ETag);
 - osu-orz compresses it with its round trip check on, so the .orz decodes to
@@ -26,10 +29,13 @@ start of the stored bytes, the start is osu!'s whole LZMA stream; when the rest
 is that tail, the replay is converted without it, and results.tsv says so.
 
 Writes to --out-dir:
-- results.tsv: a line per replay (status, sizes, the mode the .orz stores,
-  whether it stores the replay data as it is, how many bytes of ruri's tail
-  were dropped, timings, which check ran, the stored replay's ETag, the .orz's
-  MD5 and the osu-orz version)
+- results.tsv: a line per replay (status, sizes, how the .orz codes the frames,
+  the hint the encoder took, how many bytes of ruri's tail were dropped,
+  timings, which check ran, the stored replay's ETag, the .orz's MD5 and the
+  osu-orz version)
+- devices.tsv: a line per passing replay with the device its cursor positions
+  are coded on, for LOAD DATA (NULL is \\N): the device as .orz files store it
+  (hex), each axis's model and the device's parameters as JSON
 - failures.jsonl: details of each replay that did not pass
 - failed/<score id>.osr: the original bytes of each replay that did not pass
 
@@ -47,6 +53,7 @@ import collections
 import concurrent.futures
 import hashlib
 import importlib.metadata
+import itertools
 import json
 import lzma
 import random
@@ -63,14 +70,18 @@ S3_ENDPOINT = "https://s3.ca-central-1.wasabisys.com"
 ORZ_PREFIX = "replays-orz"
 OSU_ORZ_VERSION = importlib.metadata.version("osu-orz")
 
+# devices of the user's latest replays given to the encoder as hints, newest first
+HINTS = 2
+
 RESULT_FIELDS = (
     "score_id",
+    "user_id",
     "mode",
     "status",
     "bytes_in",
     "bytes_out",
-    "stored_mode",
-    "as_is",
+    "coding",
+    "hint_used",
     "ruri_tail",
     "compress_ms",
     "decompress_ms",
@@ -80,26 +91,30 @@ RESULT_FIELDS = (
     "osu_orz",
 )
 
+DEVICE_FIELDS = (
+    "score_id",
+    "user_id",
+    "mode",
+    "coding",
+    "hint_used",
+    "device",
+    "x_model",
+    "y_model",
+    "device_json",
+    "format_version",
+    "osu_orz",
+)
+
 # how osu!'s LZMA encoder starts replay data: lc 3, lp 0, pb 2, a 2 MiB dictionary
 OSU_LZMA_PROPERTIES = bytes([0x5D]) + (1 << 21).to_bytes(4, "little")
 
 # what ruri's multipart parser left after a replay starts with
 RURI_TAIL = b"\r\n-------------------------------28947758029299--"
 
-# stored_mode: the .orz's mode, which is 7 where the encoder coded the autopilot path
-ORZ_AUTOPILOT = 7
-ORZ_STORED_AS_IS = 1 << 6
-
 
 def orz_mode(akatsuki_mode):
     # autopilot replays are osu! replays to the encoder, which finds the path itself
     return osu_orz.Mode(0 if akatsuki_mode == 8 else akatsuki_mode)
-
-
-def encode_info(orz):
-    # format version 0: magic (8 bits), version (4 bits), CRC (32 bits), then
-    # the encode info (8 bits), least significant bit first
-    return (int.from_bytes(orz[:7], "little") >> 44) & 0xFF
 
 
 def replay_text(data):
@@ -159,57 +174,63 @@ def needs_byte_check(data, rate):
     )
 
 
-def compress(data, akatsuki_mode, result):
+def compress(data, akatsuki_mode, hints, result):
     """Compress data with the round trip check, noting the .orz in result.
 
-    Returns the .orz, or None when osu-orz raised an error.
+    Returns osu-orz's result, or None when osu-orz raised an error.
     """
     start = time.perf_counter()
 
     try:
-        orz = osu_orz.compress(
-            data, mode=orz_mode(akatsuki_mode), check_round_trip=True
+        compressed = osu_orz.compress(
+            data,
+            mode=orz_mode(akatsuki_mode),
+            check_round_trip=True,
+            device_hints=hints,
         )
     except osu_orz.OrzError as error:
         result["error"] = str(error)
         return None
 
-    info = encode_info(orz)
     result.update(
-        bytes_out=len(orz),
-        stored_mode=info & 15,
-        as_is=int(bool(info & ORZ_STORED_AS_IS)),
+        bytes_out=len(compressed.compressed_bytes),
+        coding=compressed.coding.name,
+        hint_used="" if compressed.hint_used is None else compressed.hint_used,
         compress_ms=round(1e3 * (time.perf_counter() - start), 1),
     )
 
-    return orz
+    return compressed
 
 
-def round_trip(data, akatsuki_mode, result):
+def round_trip(data, akatsuki_mode, hints, result):
     """Compress data and decompress the .orz, noting sizes and timings in result.
 
-    Returns the error status (None when there is none), the .orz and what it
-    decompresses to.
+    Returns the error status (None when there is none), osu-orz's result and what
+    the .orz decompresses to.
     """
-    if (orz := compress(data, akatsuki_mode, result)) is None:
+    if (compressed := compress(data, akatsuki_mode, hints, result)) is None:
         return "compress_error", None, None
 
     start = time.perf_counter()
 
     try:
-        back = osu_orz.decompress(orz)
+        back = osu_orz.decompress(compressed.compressed_bytes)
     except osu_orz.OrzError as error:
         result["error"] = str(error)
-        return "decompress_error", orz, None
+        return "decompress_error", compressed, None
 
     result["decompress_ms"] = round(1e3 * (time.perf_counter() - start), 1)
 
-    return None, orz, back
+    return None, compressed, back
 
 
-def convert(s3, score_id, akatsuki_mode, upload, byte_check_rate):
+def convert(s3, score_id, akatsuki_mode, user_id, hints, upload, byte_check_rate):
+    """Returns the result, the original bytes when the replay did not pass, and
+    osu-orz's result when it did.
+    """
     result = {
         "score_id": score_id,
+        "user_id": user_id,
         "mode": akatsuki_mode,
         "ruri_tail": 0,
         "osu_orz": OSU_ORZ_VERSION,
@@ -221,7 +242,7 @@ def convert(s3, score_id, akatsuki_mode, upload, byte_check_rate):
     except ClientError as error:
         # without permission to list the bucket, a missing replay reads as access denied
         if error.response["Error"]["Code"] in ("NoSuchKey", "AccessDenied"):
-            return {**result, "status": "missing"}, None
+            return {**result, "status": "missing"}, None, None
 
         raise
 
@@ -230,46 +251,51 @@ def convert(s3, score_id, akatsuki_mode, upload, byte_check_rate):
 
     # a multipart upload's ETag is not the MD5 of its bytes
     if "-" not in etag and hashlib.md5(data).hexdigest() != etag:
-        return {**result, "status": "bad_read"}, original
+        return {**result, "status": "bad_read"}, original, None
 
     if not needs_byte_check(data, byte_check_rate):
         result["check"] = "text"
 
-        if (orz := compress(data, akatsuki_mode, result)) is None:
-            return {**result, "status": "compress_error"}, original
+        if (compressed := compress(data, akatsuki_mode, hints, result)) is None:
+            return {**result, "status": "compress_error"}, original, None
 
-        return finish(s3, result, orz, upload), None
+        return finish(s3, result, compressed, upload), None, compressed
 
     result["check"] = "bytes"
-    error, orz, back = round_trip(data, akatsuki_mode, result)
+    error, compressed, back = round_trip(data, akatsuki_mode, hints, result)
 
     if error is None and (tail := ruri_tail(data, back)):
         data = data[:-tail]
         result["ruri_tail"] = tail
-        error, orz, back = round_trip(data, akatsuki_mode, result)
+        error, compressed, back = round_trip(data, akatsuki_mode, hints, result)
 
     if error is not None:
-        return {**result, "status": error}, original
+        return {**result, "status": error}, original, None
 
     if back == data:
-        return finish(s3, result, orz, upload), None
+        return finish(s3, result, compressed, upload), None, compressed
 
     # the frames can come back with LZMA bytes osu!'s encoder would not write
     text = replay_text(data)
     same_text = text is not None and replay_text(back) == text
 
-    return {
-        **result,
-        "status": "lzma_differs" if same_text else "text_differs",
-        "bytes_back": len(back),
-        "first_difference": first_difference(data, back),
-        "lzma_header": data[:13].hex(),
-        "lzma_header_back": back[:13].hex(),
-        "text_decodes": text is not None,
-    }, original
+    return (
+        {
+            **result,
+            "status": "lzma_differs" if same_text else "text_differs",
+            "bytes_back": len(back),
+            "first_difference": first_difference(data, back),
+            "lzma_header": data[:13].hex(),
+            "lzma_header_back": back[:13].hex(),
+            "text_decodes": text is not None,
+        },
+        original,
+        None,
+    )
 
 
-def finish(s3, result, orz, upload):
+def finish(s3, result, compressed, upload):
+    orz = compressed.compressed_bytes
     md5 = hashlib.md5(orz)
 
     if upload:
@@ -283,14 +309,82 @@ def finish(s3, result, orz, upload):
     return {**result, "status": "ok", "orz_md5": md5.hexdigest()}
 
 
+def model_name(model):
+    return type(model).__name__.lower()
+
+
+def model_fields(model):
+    """A device model's parameters, for JSON."""
+    fields = {"model": model_name(model)}
+
+    match model:
+        case osu_orz.Rational():
+            fields.update(a=model.a, b=model.b, d=model.d)
+        case osu_orz.Mouse():
+            fields.update(sensitivity=model.sensitivity, poll_rate=model.poll_rate)
+        case osu_orz.Absolute():
+            fields.update(
+                mapping=model.mapping.name.lower(),
+                span=model.span,
+                speed=model.speed,
+                window_half=model.window_half,
+                origin=model.origin,
+                x87=model.x87,
+            )
+
+    if isinstance(model, (osu_orz.Mouse, osu_orz.Absolute)):
+        playfield = model.playfield
+        fields["playfield"] = {
+            "scale": playfield.scale,
+            "offset": playfield.offset,
+            "unrounded_sub": playfield.unrounded_sub,
+        }
+
+    return fields
+
+
+def device_row(result, compressed):
+    """devices.tsv's line for a passing replay. A device's axis model is its last
+    segment's, the one the encoder takes from a hint.
+    """
+    row = {
+        "score_id": result["score_id"],
+        "user_id": result["user_id"],
+        "mode": result["mode"],
+        "coding": compressed.coding.name,
+        "hint_used": compressed.hint_used,
+        "format_version": osu_orz.FORMAT_VERSION,
+        "osu_orz": OSU_ORZ_VERSION,
+    }
+
+    if (device := compressed.device) is not None:
+        row.update(
+            device=device.data.hex(),
+            x_model=model_name(device.x[-1].model),
+            y_model=model_name(device.y[-1].model),
+            device_json=json.dumps(
+                {
+                    axis: [
+                        {"start": s.start, **model_fields(s.model)} for s in segments
+                    ]
+                    for axis, segments in (("x", device.x), ("y", device.y))
+                }
+            ),
+        )
+
+    return "\t".join(
+        "\\N" if row.get(field) is None else str(row[field]) for field in DEVICE_FIELDS
+    )
+
+
 def read_scores(path):
     for line in open(path):
-        score_id, akatsuki_mode = line.split("\t")[:2]
+        score_id, akatsuki_mode, user_id = line.rstrip("\n").split("\t")[:3]
 
         if int(akatsuki_mode) not in (0, 1, 2, 3, 4, 5, 6, 8):
             raise ValueError(f"score {score_id}: no Akatsuki mode {akatsuki_mode}")
 
-        yield int(score_id), int(akatsuki_mode)
+        yield int(score_id), int(akatsuki_mode), int(user_id)
 
 
 def summarize(results_path):
@@ -303,7 +397,7 @@ def summarize(results_path):
         + f"; {sum(row.get('check') == 'bytes' for row in rows)} byte checked"
     )
     print(
-        "mode  replays      ok  as is  autopilot   ruri  bytes in -> out (ok)  compress ms  decompress ms"
+        "mode  replays      ok  as is  autopilot  device  hinted   ruri  bytes in -> out (ok)  compress ms  decompress ms"
     )
 
     for mode in sorted({row["mode"] for row in rows}, key=int):
@@ -317,8 +411,8 @@ def summarize(results_path):
 
         bytes_in = sum(int(row["bytes_in"]) for row in ok)
         bytes_out = sum(int(row["bytes_out"]) for row in ok)
-        as_is = sum(row["as_is"] == "1" for row in group)
-        autopilot = sum(row["stored_mode"] == str(ORZ_AUTOPILOT) for row in group)
+        codings = collections.Counter(row["coding"] for row in group)
+        hinted = sum(row["hint_used"] != "" for row in group)
         ruri = sum(row["ruri_tail"] != "0" for row in group)
 
         def mean_ms(field):
@@ -326,7 +420,8 @@ def summarize(results_path):
             return sum(timed) / max(len(timed), 1)
 
         print(
-            f"{mode:>4}  {len(group):>7}  {len(ok):>6}  {as_is:>5}  {autopilot:>9}  {ruri:>5}"
+            f"{mode:>4}  {len(group):>7}  {len(ok):>6}  {codings['VERBATIM']:>5}"
+            f"  {codings['AUTOPILOT']:>9}  {codings['DEVICE']:>6}  {hinted:>6}  {ruri:>5}"
             f"  {100 * bytes_out / max(bytes_in, 1):>19.2f}%"
             f"  {mean_ms('compress_ms'):>11.0f}  {mean_ms('decompress_ms'):>13.0f}"
         )
@@ -344,7 +439,9 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("scores", help="TSV: score id, Akatsuki mode")
+    parser.add_argument(
+        "scores", help="TSV: score id, Akatsuki mode, user id; sorted by user id"
+    )
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=4, help="replays in flight")
     parser.add_argument(
@@ -381,38 +478,61 @@ def main():
         ),
     )
 
-    scores = ((i, m) for i, m in read_scores(args.scores) if i not in done)
+    scores = (score for score in read_scores(args.scores) if score[0] not in done)
+    users = (list(group) for _, group in itertools.groupby(scores, lambda s: s[2]))
     finished = 0
 
     with (
         open(results_path, "a") as results,
+        open(args.out_dir / "devices.tsv", "a") as devices,
         open(args.out_dir / "failures.jsonl", "a") as failures,
         concurrent.futures.ThreadPoolExecutor(args.workers) as pool,
     ):
-        # a bounded window of replays in flight, so a long list is never all queued at once
-        running = set()
+        # a replay in flight per user being converted, a bounded number of users at
+        # once: a user's next replay starts when the last one is done, with its device
+        # as a hint. Maps each future to its user's replays still to go and their hints
+        running = {}
 
-        def submit_next():
-            if (score := next(scores, None)) is not None:
-                running.add(
-                    pool.submit(convert, s3, *score, args.upload, args.byte_check_rate)
-                )
+        def submit(pending, hints):
+            if (score := next(pending, None)) is None:
+                return False
+
+            future = pool.submit(
+                convert, s3, *score, hints, args.upload, args.byte_check_rate
+            )
+            running[future] = pending, hints
+
+            return True
+
+        def start_user():
+            for user in users:
+                if submit(iter(user), []):
+                    return
 
         for _ in range(2 * args.workers):
-            submit_next()
+            start_user()
 
         while running:
-            completed, running = concurrent.futures.wait(
+            completed, _ = concurrent.futures.wait(
                 running, return_when=concurrent.futures.FIRST_COMPLETED
             )
 
             for future in completed:
-                result, original = future.result()
+                pending, hints = running.pop(future)
+                result, original, compressed = future.result()
 
                 results.write(
                     "\t".join(str(result.get(field, "")) for field in RESULT_FIELDS)
                     + "\n"
                 )
+
+                if compressed is not None:
+                    devices.write(device_row(result, compressed) + "\n")
+
+                    if (device := compressed.device) is not None:
+                        hints = [device] + [h for h in hints if h != device][
+                            : HINTS - 1
+                        ]
 
                 if original is not None:
                     failures.write(json.dumps(result) + "\n")
@@ -424,10 +544,12 @@ def main():
 
                 if finished % 500 == 0:
                     results.flush()
+                    devices.flush()
                     failures.flush()
                     print(f"{finished} converted", flush=True)
 
-                submit_next()
+                if not submit(pending, hints):
+                    start_user()
 
     summarize(results_path)
 
