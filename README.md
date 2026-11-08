@@ -20,7 +20,7 @@ config/
   vault/                    # HashiCorp Vault config
   apt/, cron/, systemd/     # apt periodic settings, host cron jobs, journald limits
 tf/                         # Terraform (Hetzner Cloud server and firewall, Cloudflare DNS)
-scripts/                    # Firewall, metrics backfill
+scripts/                    # Firewall, metrics backfill, replay conversion to ORZ
 systemd/                    # Unit that re-applies the firewall at boot
 setup.sh                    # Server bootstrap (full provisioning)
 ```
