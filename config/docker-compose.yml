@@ -55,6 +55,20 @@ services:
       APP_COMPONENT: "api"
       APP_PORT: "7000"
 
+  score-service-rs:
+    image: ghcr.io/osuakatsuki/score-service-rs:latest
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    logging: *json-log-rotation
+    ports:
+      - "7001:7001"
+    entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "api"
+      APP_PORT: "7001"
+
   beatmaps-service:
     image: ghcr.io/osuakatsuki/beatmaps-service:latest
     restart: unless-stopped

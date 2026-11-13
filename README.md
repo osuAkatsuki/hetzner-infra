@@ -94,6 +94,7 @@ These are the minimum services for a functional osu! server:
 |---------|------|------|---------|
 | bancho-service-rs | [osuAkatsuki/bancho-service-rs](https://github.com/osuAkatsuki/bancho-service-rs) | 5001 | Game server (osu! protocol) |
 | score-service | [osuAkatsuki/score-service](https://github.com/osuAkatsuki/score-service) | 7000 | Score submission |
+| score-service-rs | [osuAkatsuki/score-service-rs](https://github.com/osuAkatsuki/score-service-rs) | 7001 | Score submission (Rust rewrite, not routed yet) |
 | beatmaps-service | [osuAkatsuki/beatmaps-service](https://github.com/osuAkatsuki/beatmaps-service) | 8080 | Beatmap metadata & files |
 | performance-service | [osuAkatsuki/performance-service](https://github.com/osuAkatsuki/performance-service) | 8665 | PP calculation |
 | akatsuki-api | [osuAkatsuki/akatsuki-api](https://github.com/osuAkatsuki/akatsuki-api) | 40001 | REST API |
