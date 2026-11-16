@@ -362,6 +362,8 @@ services:
       GF_INSTALL_PLUGINS: "redis-datasource"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/etc/grafana/provisioning/dashboards/host.json"
       GRAFANA_READONLY_PASSWORD: "${GRAFANA_READONLY_PASSWORD}"
+      # Read by provisioning/alerting/contact-points.yml; Grafana won't start without it
+      GRAFANA_DISCORD_WEBHOOK_URL: "${GRAFANA_DISCORD_WEBHOOK_URL:?set GRAFANA_DISCORD_WEBHOOK_URL in /opt/akatsuki/.env}"
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning
 
