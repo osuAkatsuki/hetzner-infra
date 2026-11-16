@@ -30,17 +30,9 @@ chunk_store_config:
 
 schema_config:
   configs:
-    # This period's prefix contains slashes, which the compactor can't parse as a table name
-    # (it sees one table called "observability"), so its tables are never compacted and retention
-    # never deletes their logs. Later periods use a prefix without slashes.
+    # The compactor treats each top-level directory under index/ as a table, so the prefix must not
+    # contain slashes; otherwise its tables are never compacted and retention never deletes them.
     - from: "2024-01-01"
-      store: tsdb
-      object_store: aws
-      schema: v13
-      index:
-        prefix: observability/loki/index_
-        period: 24h
-    - from: "2026-11-01"
       store: tsdb
       object_store: aws
       schema: v13
