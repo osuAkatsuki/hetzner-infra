@@ -12,15 +12,15 @@ config/
   nginx/                    # Reverse proxy configs (sites-enabled, upstreams, TLS termination)
   mysql/                    # MySQL tuning (99-akatsuki.cnf)
   redis/                    # Redis config
-  grafana/provisioning/     # Datasources and dashboards
+  grafana/provisioning/     # Datasources, dashboards (Host is the home dashboard), alert rules and their Discord contact point
   prometheus/               # Prometheus scrape config
   loki/                     # Log storage config
-  alloy/                    # Collector: container, journal, host-file and cron logs, MySQL/Redis metrics
+  alloy/                    # Collector: container, journal, host-file and cron logs; MySQL, Redis, per-container and per-process metrics
   thanos/                   # Object storage config template (bucket.yml.tpl)
   vault/                    # HashiCorp Vault config
   apt/, cron/, logrotate/, systemd/  # apt periodic settings, host cron jobs and their log rotation, journald limits
 tf/                         # Terraform (Hetzner Cloud server and firewall, Cloudflare DNS)
-scripts/                    # Firewall, metrics backfill
+scripts/                    # Firewall, metrics backfill, Docker restart counts for node-exporter
 systemd/                    # Unit that re-applies the firewall at boot
 setup.sh                    # Server bootstrap (full provisioning)
 ```

@@ -360,7 +360,10 @@ services:
       GF_DATABASE_USER: "grafana"
       GF_DATABASE_PASSWORD: "${GRAFANA_DB_PASSWORD}"
       GF_INSTALL_PLUGINS: "redis-datasource"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/etc/grafana/provisioning/dashboards/host.json"
       GRAFANA_READONLY_PASSWORD: "${GRAFANA_READONLY_PASSWORD}"
+      # Read by provisioning/alerting/contact-points.yml; Grafana won't start without it
+      GRAFANA_DISCORD_WEBHOOK_URL: "${GRAFANA_DISCORD_WEBHOOK_URL:?set GRAFANA_DISCORD_WEBHOOK_URL in /opt/akatsuki/.env}"
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning
 
@@ -452,9 +455,16 @@ services:
     image: prom/node-exporter:latest
     restart: unless-stopped
     network_mode: host
+    # Report the host's processes and filesystems rather than the container's
+    pid: host
     logging: *json-log-rotation
+    volumes:
+      - /:/host:ro,rslave
     command:
+      - "--path.rootfs=/host"
       - "--web.listen-address=:9100"
+      # Written by scripts/docker-restart-metrics.sh
+      - "--collector.textfile.directory=/host/var/lib/node_exporter/textfile"
 
   loki:
     image: grafana/loki:latest
@@ -471,11 +481,20 @@ services:
       - "-config.file=/etc/loki/config.yml"
       - "-config.expand-env=true"
 
-  # Collects container, journal and host-file logs into Loki, and MySQL/Redis metrics into Prometheus
+  # Collects container, journal and host-file logs into Loki, and MySQL, Redis, per-container and
+  # per-process metrics into Prometheus
   alloy:
     image: grafana/alloy:v1.21.2
     restart: unless-stopped
     network_mode: host
+    # The process exporter reads every host process' /proc entries. Their disk I/O counters need
+    # ptrace read access, which Docker's default AppArmor profile denies for processes outside
+    # the container (it logs a denial for each read instead).
+    pid: host
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor=unconfined
     logging: *json-log-rotation
     environment:
       MYSQL_EXPORTER_PASSWORD: "${MYSQL_EXPORTER_PASSWORD}"
@@ -487,6 +506,9 @@ services:
       - /run/log/journal:/run/log/journal:ro
       - /etc/machine-id:/etc/machine-id:ro
       - alloy-data:/var/lib/alloy/data
+      # cAdvisor reads container cgroups and Docker's container metadata
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
     command:
       - "run"
       - "--server.http.listen-addr=127.0.0.1:12345"
