@@ -44,6 +44,7 @@ jobs:
             cp config/cron/akatsuki /etc/cron.d/akatsuki
             chmod 644 /etc/cron.d/akatsuki
             cmp config/cron/akatsuki /etc/cron.d/akatsuki
+            install -m 0644 config/logrotate/akatsuki /etc/logrotate.d/akatsuki
             cp config/vault/config.hcl /etc/vault.d/vault.hcl
             cp config/nginx/nginx.conf /etc/nginx/nginx.conf
             cp config/nginx/robots.txt /etc/nginx/robots.txt
