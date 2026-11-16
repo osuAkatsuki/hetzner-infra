@@ -12,7 +12,7 @@ config/
   nginx/                    # Reverse proxy configs (sites-enabled, upstreams, TLS termination)
   mysql/                    # MySQL tuning (99-akatsuki.cnf)
   redis/                    # Redis config
-  grafana/provisioning/     # Datasources and dashboards (Host is the home dashboard)
+  grafana/provisioning/     # Datasources, dashboards (Host is the home dashboard), alert rules and their Discord contact point
   prometheus/               # Prometheus scrape config
   loki/                     # Log storage config
   alloy/                    # Collector: container, journal, host-file and cron logs; MySQL, Redis, per-container and per-process metrics
