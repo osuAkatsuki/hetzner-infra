@@ -38,6 +38,14 @@ discovery.relabel "containers" {
 		regex         = "akatsuki"
 		action        = "keep"
 	}
+
+	// `docker compose run` containers (the cron jobs) get a new name on every run, which would
+	// make a new stream per run; their output is collected from the cron log files below instead
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_oneoff"]
+		regex         = "True"
+		action        = "drop"
+	}
 }
 
 loki.source.docker "containers" {
@@ -79,6 +87,28 @@ local.file_match "host_files" {
 
 loki.source.file "host_files" {
 	targets       = local.file_match.host_files.targets
+	tail_from_end = true
+	forward_to    = [loki.write.local.receiver]
+}
+
+// Host cron jobs (config/cron/akatsuki) append their output to /opt/akatsuki/logs/<job>.log.
+// Each file is labelled with its job name, which for containerized jobs is the compose service.
+local.file_match "cron" {
+	path_targets = [{"__path__" = "/opt/akatsuki/logs/*.log", "job" = "cron"}]
+}
+
+discovery.relabel "cron" {
+	targets = local.file_match.cron.targets
+
+	rule {
+		source_labels = ["__path__"]
+		regex         = "/opt/akatsuki/logs/(.+)\\.log"
+		target_label  = "service"
+	}
+}
+
+loki.source.file "cron" {
+	targets       = discovery.relabel.cron.output
 	tail_from_end = true
 	forward_to    = [loki.write.local.receiver]
 }

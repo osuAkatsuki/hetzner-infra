@@ -15,10 +15,10 @@ config/
   grafana/provisioning/     # Datasources and dashboards
   prometheus/               # Prometheus scrape config
   loki/                     # Log storage config
-  alloy/                    # Collector: container, journal and host-file logs, MySQL/Redis metrics
+  alloy/                    # Collector: container, journal, host-file and cron logs, MySQL/Redis metrics
   thanos/                   # Object storage config template (bucket.yml.tpl)
   vault/                    # HashiCorp Vault config
-  apt/, cron/, systemd/     # apt periodic settings, host cron jobs, journald limits
+  apt/, cron/, logrotate/, systemd/  # apt periodic settings, host cron jobs and their log rotation, journald limits
 tf/                         # Terraform (Hetzner Cloud server and firewall, Cloudflare DNS)
 scripts/                    # Firewall, metrics backfill
 systemd/                    # Unit that re-applies the firewall at boot
@@ -170,7 +170,7 @@ For simple local dev, you can skip nginx and hit services directly on their port
 
 Push to `main` triggers CI (`.github/workflows/deploy.yml`), which SSHes to the server, checks out `main` in `/opt/akatsuki/hetzner-infra`, and applies it:
 
-- Copies host config (apt, journald, MySQL, cron, Vault, nginx) into place. `/etc/nginx/sites-enabled` is mirrored, so deleting a file from the repo removes that site. nginx is validated and reloaded.
+- Copies host config (apt, journald, MySQL, cron, logrotate, Vault, nginx) into place. `/etc/nginx/sites-enabled` is mirrored, so deleting a file from the repo removes that site. nginx is validated and reloaded.
 - Applies the firewall and enables `akatsuki-firewall.service`, which re-applies it at boot.
 - Restarts Redis if `redis.conf` changed. CI never restarts MySQL or Vault; restart those by hand (Vault then needs unsealing).
 - Runs `docker compose up -d`, which recreates containers whose definition changed and starts any that are stopped (cron services are profile-gated and stay off). Then restarts any container whose mounted config under `config/` changed after it started.

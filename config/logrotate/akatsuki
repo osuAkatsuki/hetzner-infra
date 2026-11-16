@@ -1,0 +1,17 @@
+# Output of the host cron jobs in config/cron/akatsuki. Each run appends with >>, so rotating by
+# rename is safe: the next run creates a new file. Alloy ships every line to Loki as it's written,
+# so a week of local copies is enough.
+/opt/akatsuki/logs/new-cron.log
+/opt/akatsuki/logs/profile-history-crawler.log
+/opt/akatsuki/logs/bancho-service-rs-cleanup-cron.log
+/opt/akatsuki/logs/sql-backup.log
+/opt/akatsuki/logs/sql-backup-retention.log
+/opt/akatsuki/logs/docker-image-prune.log
+{
+    daily
+    rotate 7
+    missingok
+    notifempty
+    compress
+    delaycompress
+}
