@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - route-score-service-rs
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
