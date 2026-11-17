@@ -41,20 +41,6 @@ services:
       APP_COMPONENT: "pubsub-daemon"
       APP_PORT: "5001"
 
-  score-service:
-    image: ghcr.io/osuakatsuki/score-service:latest
-    restart: unless-stopped
-    extra_hosts: *extra-hosts
-    logging: *json-log-rotation
-    ports:
-      - "7000:7000"
-    entrypoint: ["bash", "-c", "set -a && source /scripts/bootstrap.sh"]
-    environment:
-      <<: *vault-env
-      APP_ENV: "production"
-      APP_COMPONENT: "api"
-      APP_PORT: "7000"
-
   score-service-rs:
     image: ghcr.io/osuakatsuki/score-service-rs:latest
     restart: unless-stopped
