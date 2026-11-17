@@ -94,7 +94,6 @@ These are the minimum services for a functional osu! server:
 |---------|------|------|---------|
 | bancho-service-rs | [osuAkatsuki/bancho-service-rs](https://github.com/osuAkatsuki/bancho-service-rs) | 5001 | Game server (osu! protocol) |
 | score-service-rs | [osuAkatsuki/score-service-rs](https://github.com/osuAkatsuki/score-service-rs) | 7001 | Score submission |
-| score-service | [osuAkatsuki/score-service](https://github.com/osuAkatsuki/score-service) | 7000 | Legacy score submission (no longer routed, kept for rollback) |
 | beatmaps-service | [osuAkatsuki/beatmaps-service](https://github.com/osuAkatsuki/beatmaps-service) | 8080 | Beatmap metadata & files |
 | performance-service | [osuAkatsuki/performance-service](https://github.com/osuAkatsuki/performance-service) | 8665 | PP calculation |
 | akatsuki-api | [osuAkatsuki/akatsuki-api](https://github.com/osuAkatsuki/akatsuki-api) | 40001 | REST API |
@@ -115,7 +114,7 @@ APP_ENV=local
 APP_COMPONENT=api
 ```
 
-score-service uses separate read/write DB connections (`READ_DB_*` / `WRITE_DB_*`). For local dev, point both at the same MySQL instance.
+score-service-rs takes its MySQL and Redis connections as URLs instead (`DATABASE_URL`, `REDIS_URL`); see its `.env.example`.
 
 ### 5. Service dependencies
 
@@ -126,7 +125,7 @@ beatmaps-service  (standalone - needs MySQL, osu! API key)
 performance-service  (needs beatmaps-service for .osu files)
      ^
      |
-score-service  (needs beatmaps-service, performance-service, MySQL, Redis, S3)
+score-service-rs  (needs beatmaps-service, performance-service, MySQL, Redis, S3)
      ^
      |
 bancho-service-rs  (needs beatmaps-service, performance-service, MySQL, Redis)
@@ -139,7 +138,7 @@ Start services bottom-up: beatmaps-service first, then performance-service, then
 
 ### 6. S3 storage (optional)
 
-score-service and beatmaps-service use S3 for replays and beatmap files. For local dev, you can use [MinIO](https://min.io/) as a local S3-compatible store:
+score-service-rs and beatmaps-service use S3 for replays and beatmap files. For local dev, you can use [MinIO](https://min.io/) as a local S3-compatible store:
 
 ```bash
 docker run -d --name minio -p 9000:9000 -p 9001:9001 \
