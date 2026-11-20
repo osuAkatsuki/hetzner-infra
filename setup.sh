@@ -130,6 +130,7 @@ echo "=== Configuring cron jobs ==="
 cp config/cron/akatsuki /etc/cron.d/akatsuki
 chmod 644 /etc/cron.d/akatsuki
 mkdir -p /opt/akatsuki/logs
+install -m 0644 config/logrotate/akatsuki /etc/logrotate.d/akatsuki
 
 echo "=== Enabling services ==="
 systemctl enable docker mysql redis-server rabbitmq-server postgresql nginx vault

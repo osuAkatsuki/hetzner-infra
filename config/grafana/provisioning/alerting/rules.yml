@@ -1,0 +1,161 @@
+apiVersion: 1
+
+# Each rule's A is an instant query (one value per series) and B is the threshold that fires it.
+# Notifications go to the Discord contact point in contact-points.yml.
+groups:
+  - orgId: 1
+    name: Server
+    folder: Server alerts
+    interval: 1m
+    rules:
+      - uid: root-disk-space-low
+        title: Root disk space low
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: 100 * node_filesystem_avail_bytes{job="node", mountpoint="/"} / node_filesystem_size_bytes{job="node", mountpoint="/"}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: lt, params: [15] } }]
+        for: 10m
+        # No data means node-exporter isn't reporting, so disk space isn't being watched
+        noDataState: Alerting
+        execErrState: Error
+        annotations:
+          summary: '{{ with $values.A }}The root filesystem has {{ printf "%.1f" .Value }}% free space left.{{ else }}node-exporter has stopped reporting disk space.{{ end }}'
+          description: See the Host dashboard's disk panels; the Processes and Containers dashboards show which writers are busiest.
+        notification_settings:
+          receiver: Discord alerts
+
+      - uid: container-restarting
+        title: Container restarting repeatedly
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              # Docker's restart count, exported by scripts/docker-restart-metrics.sh. Recreating a
+              # container (a deploy) resets it rather than counting as a restart.
+              expr: round(increase(docker_container_restart_count{job="node"}[15m]))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [2] } }]
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: '{{ $labels.name }} restarted {{ $values.A.Value }} times in the last 15 minutes.'
+          description: Docker keeps restarting it after it exits. Its logs in Loki ({service="{{ $labels.service }}"}) show why.
+        notification_settings:
+          receiver: Discord alerts
+
+      - uid: nginx-5xx-rate
+        title: High rate of 5xx responses
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              # Share of akatsuki.gg requests answered with a 5xx, per host, over 5 minutes. Hosts
+              # with 100 requests or fewer in the window are skipped, as are other domains (old
+              # aliases still get traffic that only produces errors).
+              expr: |-
+                sum by (host) (count_over_time({job="nginx", log="access"} | pattern `[<_>] <_> - "<_> <host> <_>" <status> <_>` | host=~`(.+\.)?akatsuki\.gg` | status >= 500 [5m]))
+                /
+                (sum by (host) (count_over_time({job="nginx", log="access"} | pattern `[<_>] <_> - "<_> <host> <_>" <status> <_>` | host=~`(.+\.)?akatsuki\.gg` [5m])) > 100)
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [0.05] } }]
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: '{{ with $values.A }}{{ humanizePercentage .Value }} of requests to {{ $labels.host }} returned a 5xx over the last 5 minutes.{{ end }}'
+          description: The service behind that host is failing or unreachable. nginx's error log ({job="nginx", log="error"}) shows upstream errors.
+        notification_settings:
+          receiver: Discord alerts
+
+      - uid: mysql-down
+        title: MySQL down
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: mysql_up{job="integrations/mysql"}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: lt, params: [1] } }]
+        for: 2m
+        # No data means Alloy's MySQL exporter isn't reporting, so MySQL isn't being watched
+        noDataState: Alerting
+        execErrState: Error
+        annotations:
+          summary: Alloy's MySQL exporter can't connect to MySQL, or has stopped reporting.
+          description: Check `systemctl status mysql` on the host, then MySQL's error log ({job="integrations/mysql"}).
+        notification_settings:
+          receiver: Discord alerts
+
+  - orgId: 1
+    name: Daily jobs
+    folder: Server alerts
+    interval: 10m
+    rules:
+      - uid: sql-backup-missing
+        title: No successful SQL backup in 26 hours
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              # backup.sh runs daily at 04:00 UTC and prints "Done!" only after the upload
+              # succeeds; it exits on the first error
+              expr: sum(count_over_time({job="cron", service="sql-backup"} |= "Done!" [26h])) or vector(0)
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: lt, params: [1] } }]
+        for: 0s
+        noDataState: Alerting
+        execErrState: Error
+        annotations:
+          summary: The daily SQL backup hasn't completed in the last 26 hours.
+          description: Its output is in Loki ({job="cron", service="sql-backup"}) and /opt/akatsuki/logs/sql-backup.log on the host.
+        notification_settings:
+          receiver: Discord alerts
