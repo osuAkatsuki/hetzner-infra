@@ -34,6 +34,9 @@ did not give (read_error), which are read again. With --upload,
 passing replays are written to replays-orz/<score id>.orz, replacing what is
 there, with their MD5 for S3 to check.
 
+--from-user and --to-user keep a run to the users whose ids are in that range,
+so that several machines can each take a part of the list.
+
     AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... \\
         ./convert-replays-to-orz.py scores.tsv --out-dir orz-run
 """
@@ -404,6 +407,12 @@ def main() -> None:
     parser.add_argument(
         "--upload", action="store_true", help=f"write passing replays to {ORZ_PREFIX}/"
     )
+    parser.add_argument(
+        "--from-user", type=int, default=0, help="the lowest user id to convert"
+    )
+    parser.add_argument(
+        "--to-user", type=int, default=2**63, help="the highest user id to convert"
+    )
     args = parser.parse_args()
 
     (args.out_dir / "failed").mkdir(parents=True, exist_ok=True)
@@ -424,7 +433,11 @@ def main() -> None:
         if row["status"] != "read_error"
     }
 
-    scores = (s for s in read_scores(args.scores) if s.score_id not in done)
+    scores = (
+        s
+        for s in read_scores(args.scores)
+        if args.from_user <= s.user_id <= args.to_user and s.score_id not in done
+    )
     users = (list(user) for _, user in itertools.groupby(scores, lambda s: s.user_id))
 
     # the pool takes users from its input as fast as that gives them, far ahead of
