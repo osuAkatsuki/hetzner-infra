@@ -8,22 +8,20 @@
 Reads a TSV of score ids, Akatsuki modes (0-3 vanilla, 4-6 relax, 8 autopilot)
 and user ids, sorted by user id, and fetches each replay from
 replays/<score id>.osr. A user's replays are compressed in the list's order,
-each with the setups of the user's latest two replays as hints, so the encoder
-tries their devices before it searches. Every replay is checked:
+each with the setups found most often for the user's replays before it as
+hints, so the encoder tries their devices before it searches. Users are
+converted side by side, each in a process of its own. Every replay is checked:
 
 - the bytes read have the MD5 S3 has for them (a single-part upload's ETag);
 - osu-orz compresses it with its round trip check on, so the .orz decodes to
   the same replay text, or stores the replay data as it is when it would not.
 
 An .orz gives back the replay's text, in LZMA bytes of its own: what comes
-back is the same replay, not the stored bytes. A decode check decompresses the
-.orz as a reader would and compares the text with the stored replay's. It runs
-for a random share of replays (--decode-check-rate), and for every replay
-stored as it is, which must come back byte for byte.
+back is the same replay, not the stored bytes.
 
 Writes to --out-dir:
 - results.tsv: a line per replay (status, sizes, how the .orz codes the frames,
-  the input of the setup found, timings, which check ran, the stored replay's
+  the input of the setup found, the time to compress, the stored replay's
   ETag, the .orz's MD5 and the osu-orz version)
 - setups.tsv: a line per passing replay with the player's setup as the encoder
   recognised it, for LOAD DATA (NULL is \\N): its input, and as JSON its other
@@ -43,15 +41,18 @@ there, with their MD5 for S3 to check.
 import argparse
 import base64
 import collections
-import concurrent.futures
+import functools
 import hashlib
 import importlib.metadata
 import itertools
 import json
-import lzma
-import random
+import multiprocessing
+import os
+import threading
 import time
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
+from typing import Any, NamedTuple, TextIO
 
 import boto3
 import osu_orz
@@ -63,7 +64,7 @@ S3_ENDPOINT = "https://s3.ca-central-1.wasabisys.com"
 ORZ_PREFIX = "replays-orz"
 OSU_ORZ_VERSION = importlib.metadata.version("osu-orz")
 
-# setups of the user's latest replays given to the encoder as hints, newest first
+# setups given to the encoder as hints: those most of the user's replays so far had
 HINTS = 2
 
 # tries at a read or a write, past botocore's own: S3 has bad minutes, and connections drop
@@ -79,8 +80,6 @@ RESULT_FIELDS = (
     "coding",
     "input",
     "compress_ms",
-    "decompress_ms",
-    "check",
     "etag",
     "orz_md5",
     "osu_orz",
@@ -119,57 +118,73 @@ SETUP_FIELDS = (
 
 NO_SETUP = osu_orz.Setup()
 
+# a line of results.tsv by field, with more about a replay that did not pass
+Result = dict[str, Any]
 
-def is_missing(error):
+
+class Score(NamedTuple):
+    score_id: int
+    akatsuki_mode: int
+    user_id: int
+
+
+class Worker(NamedTuple):
+    """What a process converts with. Each line it writes is one append to a file
+    the processes share, so their lines do not mix.
+    """
+
+    s3: Any
+    results: TextIO
+    setups: TextIO
+    failures: TextIO
+    failed_dir: Path
+
+
+worker: Worker
+
+
+def start_worker(out_dir: Path) -> None:
+    global worker
+
+    worker = Worker(
+        s3=boto3.client(
+            "s3",
+            endpoint_url=S3_ENDPOINT,
+            config=Config(retries={"mode": "adaptive", "max_attempts": 5}),
+        ),
+        results=open(out_dir / "results.tsv", "a", buffering=1),
+        setups=open(out_dir / "setups.tsv", "a", buffering=1),
+        failures=open(out_dir / "failures.jsonl", "a", buffering=1),
+        failed_dir=out_dir / "failed",
+    )
+
+
+def is_missing(error: ClientError) -> bool:
     # without permission to list the bucket, a missing replay reads as access denied
     return error.response["Error"]["Code"] in ("NoSuchKey", "AccessDenied")
 
 
-def with_retries(call):
-    for attempt in range(ATTEMPTS):
+def with_retries[T](call: Callable[[], T]) -> T:
+    for attempt in range(ATTEMPTS - 1):
         try:
             return call()
         except Exception as error:
             if isinstance(error, ClientError) and is_missing(error):
                 raise
 
-            if attempt == ATTEMPTS - 1:
-                raise
-
             time.sleep(2**attempt)
 
+    return call()
 
-def orz_mode(akatsuki_mode):
+
+def orz_mode(akatsuki_mode: int) -> osu_orz.Mode:
     # autopilot replays are osu! replays to the encoder, which finds the path itself
     return osu_orz.Mode(0 if akatsuki_mode == 8 else akatsuki_mode)
 
 
-def replay_text(data):
-    """The text in replay data, or None when it does not decode.
-
-    Replay data is the LZMA properties byte, the dictionary size, the text size
-    (u64), then the LZMA stream.
-    """
-    if len(data) < 13 or data[0] >= 9 * 5 * 5:
-        return None
-
-    size = int.from_bytes(data[5:13], "little")
-    lzma_filter = {
-        "id": lzma.FILTER_LZMA1,
-        "dict_size": int.from_bytes(data[1:5], "little"),
-        "lc": data[0] % 9,
-        "lp": data[0] // 9 % 5,
-        "pb": data[0] // 45,
-    }
-
-    try:
-        decoder = lzma.LZMADecompressor(lzma.FORMAT_RAW, filters=[lzma_filter])
-        return decoder.decompress(data[13:], max_length=size if size < 2**31 else -1)
-    except (lzma.LZMAError, ValueError):
-        return None
-
-
-def compress(data, akatsuki_mode, hints, result):
+def compress(
+    data: bytes, akatsuki_mode: int, hints: list[osu_orz.Setup], result: Result
+) -> osu_orz.CompressResult | None:
     """Compress data with the round trip check, noting the .orz in result.
 
     Returns osu-orz's result, or None when osu-orz raised an error.
@@ -198,19 +213,23 @@ def compress(data, akatsuki_mode, hints, result):
     return compressed
 
 
-def convert(s3, score_id, akatsuki_mode, user_id, hints, upload, decode_check_rate):
+def convert(
+    score: Score, hints: list[osu_orz.Setup], upload: bool
+) -> tuple[Result, bytes | None, osu_orz.CompressResult | None]:
     """Returns the result, the original bytes when the replay did not pass, and
     osu-orz's result when it did.
     """
-    result = {
-        "score_id": score_id,
-        "user_id": user_id,
-        "mode": akatsuki_mode,
+    result: Result = {
+        "score_id": score.score_id,
+        "user_id": score.user_id,
+        "mode": score.akatsuki_mode,
         "osu_orz": OSU_ORZ_VERSION,
     }
 
-    def read():
-        response = s3.get_object(Bucket=S3_BUCKET, Key=f"replays/{score_id}.osr")
+    def read() -> tuple[str, bytes]:
+        response = worker.s3.get_object(
+            Bucket=S3_BUCKET, Key=f"replays/{score.score_id}.osr"
+        )
         return response["ETag"].strip('"'), response["Body"].read()
 
     try:
@@ -228,52 +247,19 @@ def convert(s3, score_id, akatsuki_mode, user_id, hints, upload, decode_check_ra
     if "-" not in etag and hashlib.md5(data).hexdigest() != etag:
         return {**result, "status": "bad_read"}, data, None
 
-    result["check"] = "round_trip"
-
-    if (compressed := compress(data, akatsuki_mode, hints, result)) is None:
+    if (compressed := compress(data, score.akatsuki_mode, hints, result)) is None:
         return {**result, "status": "compress_error"}, data, None
 
-    as_is = compressed.coding == osu_orz.Coding.VERBATIM
-
-    if not as_is and random.random() >= decode_check_rate:
-        return finish(s3, result, compressed, upload), None, compressed
-
-    result["check"] = "decode"
-    start = time.perf_counter()
-
-    try:
-        back = osu_orz.decompress(compressed.compressed_bytes)
-    except osu_orz.OrzError as error:
-        return {**result, "error": str(error), "status": "decompress_error"}, data, None
-
-    result["decompress_ms"] = round(1e3 * (time.perf_counter() - start), 1)
-
-    text = None if as_is else replay_text(data)
-
-    if back == data or (text is not None and replay_text(back) == text):
-        return finish(s3, result, compressed, upload), None, compressed
-
-    return (
-        {
-            **result,
-            "status": "differs",
-            "bytes_back": len(back),
-            "lzma_header": data[:13].hex(),
-            "lzma_header_back": back[:13].hex(),
-            "text_decodes": text is not None,
-        },
-        data,
-        None,
-    )
+    return finish(result, compressed, upload), None, compressed
 
 
-def finish(s3, result, compressed, upload):
+def finish(result: Result, compressed: osu_orz.CompressResult, upload: bool) -> Result:
     orz = compressed.compressed_bytes
     md5 = hashlib.md5(orz)
 
     if upload:
         with_retries(
-            lambda: s3.put_object(
+            lambda: worker.s3.put_object(
                 Bucket=S3_BUCKET,
                 Key=f"{ORZ_PREFIX}/{result['score_id']}.orz",
                 Body=orz,
@@ -284,14 +270,47 @@ def finish(s3, result, compressed, upload):
     return {**result, "status": "ok", "orz_md5": md5.hexdigest()}
 
 
-def setup_key(setup):
-    """What tells one setup from another."""
+def convert_user(scores: Sequence[Score], upload: bool) -> int:
+    """Convert all of one user's replays in order, each with the user's most
+    frequent setups so far as hints, and write their lines. Returns how many.
+    """
+    # the user's setups by what they are, each as its latest replay had it
+    setups: dict[tuple[Any, ...], osu_orz.Setup] = {}
+    replays: collections.Counter[tuple[Any, ...]] = collections.Counter()
+
+    for score in scores:
+        hints = [setups[key] for key, _ in replays.most_common(HINTS)]
+        result, original, compressed = convert(score, hints, upload)
+
+        worker.results.write(
+            "\t".join(str(result.get(field, "")) for field in RESULT_FIELDS) + "\n"
+        )
+
+        if compressed is not None:
+            worker.setups.write(setup_row(result, compressed) + "\n")
+
+            if (setup := compressed.setup) is not None:
+                key = setup_key(setup)
+                setups[key] = setup
+                replays[key] += 1
+
+        if result["status"] not in ("ok", "missing"):
+            worker.failures.write(json.dumps(result) + "\n")
+
+        if original is not None:
+            (worker.failed_dir / f"{score.score_id}.osr").write_bytes(original)
+
+    return len(scores)
+
+
+def setup_key(setup: osu_orz.Setup) -> tuple[Any, ...]:
+    """What tells one setup from another: missed is how well it fit one replay."""
     return tuple(getattr(setup, field) for field in SETUP_FIELDS if field != "missed")
 
 
-def setup_row(result, compressed):
+def setup_row(result: Result, compressed: osu_orz.CompressResult) -> str:
     """setups.tsv's line for a passing replay."""
-    row = {
+    row: dict[str, Any] = {
         "score_id": result["score_id"],
         "user_id": result["user_id"],
         "mode": result["mode"],
@@ -316,17 +335,17 @@ def setup_row(result, compressed):
     )
 
 
-def read_scores(path):
+def read_scores(path: str) -> Iterator[Score]:
     for line in open(path):
         score_id, akatsuki_mode, user_id = line.rstrip("\n").split("\t")[:3]
 
         if int(akatsuki_mode) not in (0, 1, 2, 3, 4, 5, 6, 8):
             raise ValueError(f"score {score_id}: no Akatsuki mode {akatsuki_mode}")
 
-        yield int(score_id), int(akatsuki_mode), int(user_id)
+        yield Score(int(score_id), int(akatsuki_mode), int(user_id))
 
 
-def summarize(results_path):
+def summarize(results_path: Path) -> None:
     # a replay read again after a read error has a line per run: its last one counts
     rows = list({row["score_id"]: row for row in tsv_rows(results_path)}.values())
     statuses = collections.Counter(row["status"] for row in rows)
@@ -334,10 +353,9 @@ def summarize(results_path):
     print(
         f"{len(rows)} replays: "
         + ", ".join(f"{n} {s}" for s, n in statuses.most_common())
-        + f"; {sum(row.get('check') == 'decode' for row in rows)} decode checked"
     )
     print(
-        "mode  replays      ok  as is  autopilot  standard  setup  bytes in -> out (ok)  compress ms  decompress ms"
+        "mode  replays      ok  as is  autopilot  standard  setup  bytes in -> out (ok)  compress ms"
     )
 
     for mode in sorted({row["mode"] for row in rows}, key=int):
@@ -354,19 +372,17 @@ def summarize(results_path):
         codings = collections.Counter(row["coding"] for row in group)
         setups = sum(row["input"] != "" for row in group)
 
-        def mean_ms(field):
-            timed = [float(row[field]) for row in group if row[field]]
-            return sum(timed) / max(len(timed), 1)
+        timed = [float(row["compress_ms"]) for row in group if row["compress_ms"]]
 
         print(
             f"{mode:>4}  {len(group):>7}  {len(ok):>6}  {codings['VERBATIM']:>5}"
             f"  {codings['AUTOPILOT']:>9}  {codings['STANDARD']:>8}  {setups:>5}"
             f"  {100 * bytes_out / max(bytes_in, 1):>19.2f}%"
-            f"  {mean_ms('compress_ms'):>11.0f}  {mean_ms('decompress_ms'):>13.0f}"
+            f"  {sum(timed) / max(len(timed), 1):>11.0f}"
         )
 
 
-def tsv_rows(path):
+def tsv_rows(path: Path) -> Iterator[dict[str, str]]:
     with open(path) as f:
         header = f.readline().rstrip("\n").split("\t")
 
@@ -374,7 +390,7 @@ def tsv_rows(path):
             yield dict(zip(header, line.rstrip("\n").split("\t")))
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -382,15 +398,11 @@ def main():
         "scores", help="TSV: score id, Akatsuki mode, user id; sorted by user id"
     )
     parser.add_argument("--out-dir", type=Path, required=True)
-    parser.add_argument("--workers", type=int, default=4, help="replays in flight")
     parser.add_argument(
-        "--upload", action="store_true", help=f"write passing replays to {ORZ_PREFIX}/"
+        "--workers", type=int, default=os.cpu_count(), help="processes converting"
     )
     parser.add_argument(
-        "--decode-check-rate",
-        type=float,
-        default=0.02,
-        help="share of replays to also decompress and compare with the stored replay",
+        "--upload", action="store_true", help=f"write passing replays to {ORZ_PREFIX}/"
     )
     args = parser.parse_args()
 
@@ -412,90 +424,29 @@ def main():
         if row["status"] != "read_error"
     }
 
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=S3_ENDPOINT,
-        config=Config(
-            max_pool_connections=args.workers,
-            retries={"mode": "adaptive", "max_attempts": 5},
-        ),
-    )
+    scores = (s for s in read_scores(args.scores) if s.score_id not in done)
+    users = (list(user) for _, user in itertools.groupby(scores, lambda s: s.user_id))
 
-    scores = (score for score in read_scores(args.scores) if score[0] not in done)
-    users = (list(group) for _, group in itertools.groupby(scores, lambda s: s[2]))
+    # the pool takes users from its input as fast as that gives them, far ahead of
+    # the processes: a user is given only once one handed out before has come back
+    waiting = threading.BoundedSemaphore(2 * args.workers)
+
+    def as_room_allows(users: Iterator[list[Score]]) -> Iterator[list[Score]]:
+        for user in users:
+            waiting.acquire()
+            yield user
+
+    convert_one_user = functools.partial(convert_user, upload=args.upload)
     finished = 0
 
-    with (
-        open(results_path, "a") as results,
-        open(args.out_dir / "setups.tsv", "a") as setups,
-        open(args.out_dir / "failures.jsonl", "a") as failures,
-        concurrent.futures.ThreadPoolExecutor(args.workers) as pool,
-    ):
-        # a replay in flight per user being converted, a bounded number of users at
-        # once: a user's next replay starts when the last one is done, with its setup
-        # as a hint. Maps each future to its user's replays still to go and their hints
-        running = {}
+    with multiprocessing.Pool(args.workers, start_worker, [args.out_dir]) as pool:
+        for count in pool.imap_unordered(convert_one_user, as_room_allows(users)):
+            waiting.release()
 
-        def submit(pending, hints):
-            if (score := next(pending, None)) is None:
-                return False
+            if (finished + count) // 500 > finished // 500:
+                print(f"{finished + count} converted", flush=True)
 
-            future = pool.submit(
-                convert, s3, *score, hints, args.upload, args.decode_check_rate
-            )
-            running[future] = pending, hints
-
-            return True
-
-        def start_user():
-            for user in users:
-                if submit(iter(user), []):
-                    return
-
-        for _ in range(2 * args.workers):
-            start_user()
-
-        while running:
-            completed, _ = concurrent.futures.wait(
-                running, return_when=concurrent.futures.FIRST_COMPLETED
-            )
-
-            for future in completed:
-                pending, hints = running.pop(future)
-                result, original, compressed = future.result()
-
-                results.write(
-                    "\t".join(str(result.get(field, "")) for field in RESULT_FIELDS)
-                    + "\n"
-                )
-
-                if compressed is not None:
-                    setups.write(setup_row(result, compressed) + "\n")
-
-                    if (setup := compressed.setup) is not None:
-                        key = setup_key(setup)
-                        hints = [setup] + [h for h in hints if setup_key(h) != key][
-                            : HINTS - 1
-                        ]
-
-                if result["status"] not in ("ok", "missing"):
-                    failures.write(json.dumps(result) + "\n")
-
-                if original is not None:
-                    (args.out_dir / "failed" / f"{result['score_id']}.osr").write_bytes(
-                        original
-                    )
-
-                finished += 1
-
-                if finished % 500 == 0:
-                    results.flush()
-                    setups.flush()
-                    failures.flush()
-                    print(f"{finished} converted", flush=True)
-
-                if not submit(pending, hints):
-                    start_user()
+            finished += count
 
     summarize(results_path)
 
