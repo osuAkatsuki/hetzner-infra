@@ -38,6 +38,14 @@ discovery.relabel "containers" {
 		regex         = "akatsuki"
 		action        = "keep"
 	}
+
+	// `docker compose run` containers (the cron jobs) get a new name on every run, which would
+	// make a new stream per run; their output is collected from the cron log files below instead
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_oneoff"]
+		regex         = "True"
+		action        = "drop"
+	}
 }
 
 loki.source.docker "containers" {
@@ -79,6 +87,28 @@ local.file_match "host_files" {
 
 loki.source.file "host_files" {
 	targets       = local.file_match.host_files.targets
+	tail_from_end = true
+	forward_to    = [loki.write.local.receiver]
+}
+
+// Host cron jobs (config/cron/akatsuki) append their output to /opt/akatsuki/logs/<job>.log.
+// Each file is labelled with its job name, which for containerized jobs is the compose service.
+local.file_match "cron" {
+	path_targets = [{"__path__" = "/opt/akatsuki/logs/*.log", "job" = "cron"}]
+}
+
+discovery.relabel "cron" {
+	targets = local.file_match.cron.targets
+
+	rule {
+		source_labels = ["__path__"]
+		regex         = "/opt/akatsuki/logs/(.+)\\.log"
+		target_label  = "service"
+	}
+}
+
+loki.source.file "cron" {
+	targets       = discovery.relabel.cron.output
 	tail_from_end = true
 	forward_to    = [loki.write.local.receiver]
 }
@@ -129,10 +159,37 @@ prometheus.exporter.redis "default" {
 	redis_addr = "127.0.0.1:6379"
 }
 
+// CPU, memory and disk I/O per Docker container
+prometheus.exporter.cadvisor "containers" {
+	docker_only                  = true
+	disable_root_cgroup_stats    = true
+	store_container_labels       = false
+	allowlisted_container_labels = ["com.docker.compose.service", "com.docker.compose.oneoff"]
+	enabled_metrics              = ["cpu", "memory", "diskIO", "oom_event"]
+}
+
+// CPU, memory and disk I/O per process name, which covers the host services outside Docker
+// (MySQL, Redis, RabbitMQ, PostgreSQL, nginx, Vault)
+prometheus.exporter.process "host" {
+	// Otherwise a process joins the group of its first matched ancestor, which for nearly every
+	// process is systemd
+	track_children = false
+	track_threads  = false
+	gather_smaps   = false
+
+	matcher {
+		name = "{{.Comm}}"
+		// Kernel threads have no command line
+		cmdline = [".+"]
+	}
+}
+
 discovery.relabel "exporters" {
 	targets = array.concat(
 		prometheus.exporter.mysql.default.targets,
 		prometheus.exporter.redis.default.targets,
+		prometheus.exporter.cadvisor.containers.targets,
+		prometheus.exporter.process.host.targets,
 	)
 
 	rule {
@@ -142,8 +199,31 @@ discovery.relabel "exporters" {
 }
 
 prometheus.scrape "exporters" {
-	targets    = discovery.relabel.exporters.output
+	targets = discovery.relabel.exporters.output
+	// Prometheus' own interval; also short enough to catch a container that restarts every minute
+	scrape_interval = "15s"
+	forward_to      = [prometheus.relabel.exporters.receiver]
+}
+
+prometheus.relabel "exporters" {
 	forward_to = [prometheus.remote_write.local.receiver]
+
+	// `docker compose run` containers (the cron jobs) get a new name on every run
+	rule {
+		source_labels = ["container_label_com_docker_compose_oneoff"]
+		regex         = "True"
+		action        = "drop"
+	}
+
+	rule {
+		source_labels = ["container_label_com_docker_compose_service"]
+		target_label  = "service"
+	}
+
+	rule {
+		regex  = "container_label_.+"
+		action = "labeldrop"
+	}
 }
 
 // Requires Prometheus' --web.enable-remote-write-receiver
