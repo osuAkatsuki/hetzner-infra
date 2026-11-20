@@ -215,8 +215,8 @@ def convert(s3, score_id, akatsuki_mode, user_id, hints, upload, decode_check_ra
 
     try:
         etag, data = with_retries(read)
-    except ClientError as error:
-        if is_missing(error):
+    except Exception as error:
+        if isinstance(error, ClientError) and is_missing(error):
             return {**result, "status": "missing"}, None, None
 
         # S3 has the object and does not give it: one to read again in a later run
