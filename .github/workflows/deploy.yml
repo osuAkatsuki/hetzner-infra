@@ -29,6 +29,13 @@ jobs:
             git checkout -f -B main origin/main
             git clean -fd
 
+            # The database backup runs on the host from cron.
+            if ! command -v age >/dev/null; then
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 apt-get install -y --no-install-recommends age
+            fi
+            age --version
+
             # Apply config changes
             install -D -m 0644 config/apt/apt.conf.d/99-akatsuki-periodic-upgrades /etc/apt/apt.conf.d/99-akatsuki-periodic-upgrades
             test "$(apt-config shell UPDATE_PACKAGE_LISTS APT::Periodic::Update-Package-Lists)" = "UPDATE_PACKAGE_LISTS='0'"
