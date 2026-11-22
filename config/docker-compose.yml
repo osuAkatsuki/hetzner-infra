@@ -518,7 +518,7 @@ services:
   # === Tools ===
 
   phpmyadmin:
-    image: phpmyadmin:latest
+    image: phpmyadmin:5.2.3
     restart: unless-stopped
     network_mode: host
     logging: *json-log-rotation
