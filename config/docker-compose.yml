@@ -526,6 +526,7 @@ services:
       PMA_HOST: "127.0.0.1"
       PMA_PORT: "3306"
       APACHE_PORT: "8087"
+      PMA_ABSOLUTE_URI: "https://old.akatsuki.gg/phpmyadmin/"
 
   # === Non-Akatsuki ===
 

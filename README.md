@@ -195,17 +195,6 @@ Secrets are kept out of the repo, in these files on the host:
 | `config/thanos/bucket.yml` | Thanos object storage config (gitignored) | `setup.sh`, from `bucket.yml.tpl` |
 | `/etc/ssl/private/akatsuki-origin.key` | Cloudflare origin certificate key | hand |
 
-## Database administration
-
-Use an SSH tunnel to access phpMyAdmin. Replace `production-ssh-host` with
-your usual production SSH destination.
-
-```sh
-ssh -N -L 8087:127.0.0.1:8087 production-ssh-host
-```
-
-Open `http://127.0.0.1:8087/` while the tunnel is running.
-
 ## License
 
 MIT
