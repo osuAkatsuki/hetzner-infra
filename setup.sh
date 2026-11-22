@@ -28,7 +28,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     postgresql postgresql-contrib postgresql-16-postgis-3 \
     nginx \
     python3-pip python3-venv \
-    curl jq
+    age curl jq
 pip3 install --break-system-packages awscli
 
 echo "=== Configuring firewall ==="
