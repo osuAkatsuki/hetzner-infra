@@ -1,6 +1,7 @@
 name: Terraform
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths: [tf/**]
@@ -17,6 +18,7 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.WASABI_SECRET_KEY }}
   TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
   TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  TF_VAR_irc_spectrum_enabled: ${{ vars.IRC_SPECTRUM_ENABLED || 'false' }}
   TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
   TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
 

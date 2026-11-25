@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # Policy: DROP all inbound by default (IPv4 and IPv6), allow only:
 #   - SSH (22) from anywhere
-#   - HTTP (80) and HTTPS (443) from Cloudflare IPv4 ranges only
+#   - HTTP (80), HTTPS (443) and IRC TLS (6697) from Cloudflare IPv4 ranges only
 #   - Everything on loopback (services communicate via 127.0.0.1)
 #   - Established/related connections (return traffic)
 #
@@ -62,6 +62,7 @@ CF_IPS=(
 for cidr in "${CF_IPS[@]}"; do
     iptables -A INPUT -p tcp -s "$cidr" --dport 80 -j ACCEPT
     iptables -A INPUT -p tcp -s "$cidr" --dport 443 -j ACCEPT
+    iptables -A INPUT -p tcp -s "$cidr" --dport 6697 -j ACCEPT
 done
 
 # Log dropped packets (rate-limited)

@@ -96,3 +96,22 @@ resource "cloudflare_record" "travel_cmyui_xyz" {
   proxied = true
   ttl     = 1
 }
+
+resource "cloudflare_spectrum_application" "irc" {
+  count         = var.irc_spectrum_enabled ? 1 : 0
+  zone_id       = var.cloudflare_zone_id
+  protocol      = "tcp/6697"
+  traffic_type  = "direct"
+  tls           = "off" # Bancho terminates TLS using the public IRC certificate.
+  origin_direct = ["tcp://${hcloud_server.production.ipv4_address}:6697"]
+
+  dns {
+    type = "CNAME"
+    name = "irc.akatsuki.gg"
+  }
+
+  edge_ips {
+    type         = "dynamic"
+    connectivity = "all"
+  }
+}
