@@ -93,6 +93,7 @@ These are the minimum services for a functional osu! server:
 | Service | Repo | Port | Purpose |
 |---------|------|------|---------|
 | bancho-service-rs | [osuAkatsuki/bancho-service-rs](https://github.com/osuAkatsuki/bancho-service-rs) | 5001 | Game server (osu! protocol) |
+| bancho-service-rs-irc | [osuAkatsuki/bancho-service-rs](https://github.com/osuAkatsuki/bancho-service-rs) | 6697 | Tournament IRC over TLS |
 | score-service-rs | [osuAkatsuki/score-service-rs](https://github.com/osuAkatsuki/score-service-rs) | 7001 | Score submission |
 | score-service | [osuAkatsuki/score-service](https://github.com/osuAkatsuki/score-service) | 7000 | Legacy score submission (no longer routed, kept for rollback) |
 | beatmaps-service | [osuAkatsuki/beatmaps-service](https://github.com/osuAkatsuki/beatmaps-service) | 8080 | Beatmap metadata & files |
@@ -198,3 +199,27 @@ Secrets are kept out of the repo, in these files on the host:
 ## License
 
 MIT
+
+## Tournament IRC
+
+Compose runs tournament IRC under the `irc` profile. Cloudflare Spectrum
+publishes `irc.akatsuki.gg:6697` and passes TCP through to Bancho. Spectrum
+must support custom TCP applications for the zone. The Hetzner firewall
+permits connections from the Cloudflare IPv4 ranges when the endpoint is enabled.
+
+1. Install a publicly trusted certificate for `irc.akatsuki.gg` using a DNS
+   challenge. Place the PEM chain and key at
+   `/opt/akatsuki/irc-tls/fullchain.pem` and
+   `/opt/akatsuki/irc-tls/privkey.pem`. Keep the private key readable only by
+   root. Copy both renewed files to that directory and restart the IRC service
+   after each renewal.
+2. From `/opt/akatsuki`, start the published Bancho image with
+   `docker compose --profile irc up --pull always -d bancho-service-rs-irc`.
+3. Set the repository variable `IRC_SPECTRUM_ENABLED` to `true` and run the
+   Terraform workflow on `main`. Confirm the certificate and handshake from a
+   TLS IRC client. Use an Akatsuki username with spaces replaced by underscores,
+   the token from `https://akatsuki.gg/irc`, and send `!mp make <name>` to Aika.
+
+To withdraw public ingress, set `IRC_SPECTRUM_ENABLED` to `false` and run the
+Terraform workflow. Stop the listener with
+`docker compose --profile irc stop bancho-service-rs-irc`.

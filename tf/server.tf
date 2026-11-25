@@ -58,4 +58,15 @@ resource "hcloud_firewall" "production" {
       source_ips  = rule.value
     }
   }
+
+  dynamic "rule" {
+    for_each = var.irc_spectrum_enabled ? [var.cloudflare_ipv4_ranges] : []
+    content {
+      description = "Tournament IRC from Cloudflare Spectrum"
+      direction   = "in"
+      protocol    = "tcp"
+      port        = "6697"
+      source_ips  = rule.value
+    }
+  }
 }

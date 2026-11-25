@@ -40,3 +40,9 @@ variable "cloudflare_ipv4_ranges" {
     "131.0.72.0/22",
   ]
 }
+
+variable "irc_spectrum_enabled" {
+  description = "Publish the Cloudflare Spectrum endpoint for tournament IRC"
+  type        = bool
+  default     = false
+}

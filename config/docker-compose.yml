@@ -41,6 +41,31 @@ services:
       APP_COMPONENT: "pubsub-daemon"
       APP_PORT: "5001"
 
+  bancho-service-rs-irc:
+    image: ghcr.io/osuakatsuki/bancho-service-rs:latest
+    profiles: [irc]
+    restart: unless-stopped
+    extra_hosts: *extra-hosts
+    logging: *json-log-rotation
+    ports:
+      - "0.0.0.0:6697:6697"
+    volumes:
+      - type: bind
+        source: /opt/akatsuki/irc-tls
+        target: /run/irc-tls
+        read_only: true
+        bind:
+          create_host_path: false
+    entrypoint: ["bash", "-c", "set -a && source /app/scripts/entrypoint.sh"]
+    environment:
+      <<: *vault-env
+      APP_ENV: "production"
+      APP_COMPONENT: "irc"
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "6697"
+      IRC_TLS_CERT_PATH: /run/irc-tls/fullchain.pem
+      IRC_TLS_KEY_PATH: /run/irc-tls/privkey.pem
+
   score-service:
     image: ghcr.io/osuakatsuki/score-service:latest
     restart: unless-stopped
